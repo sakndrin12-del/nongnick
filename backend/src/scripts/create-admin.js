@@ -2,9 +2,10 @@ import 'dotenv/config'
 import bcrypt from 'bcrypt'
 import { prisma } from '../db.js'
 
-const username = process.env.ADMIN_INITIAL_USERNAME?.trim()
-const fullname = process.env.ADMIN_INITIAL_FULLNAME?.trim()
-const password = process.env.ADMIN_INITIAL_PASSWORD
+const [argUsername, argFullname, argPassword] = process.argv.slice(2)
+const username = (argUsername ?? process.env.ADMIN_INITIAL_USERNAME)?.trim()
+const fullname = (argFullname ?? process.env.ADMIN_INITIAL_FULLNAME)?.trim()
+const password = argPassword ?? process.env.ADMIN_INITIAL_PASSWORD
 
 if (!username || username.length > 80 || !fullname || fullname.length > 160 || !password || password.length < 12 || password.length > 200) {
   console.error('Set ADMIN_INITIAL_USERNAME, ADMIN_INITIAL_FULLNAME, and an ADMIN_INITIAL_PASSWORD of 12–200 characters in backend/.env.')
