@@ -39,9 +39,32 @@ function firstHitInWindow(key) {
 const publicArticle = { status: 'PUBLISHED' }
 const articleSelect = {
   articleId: true, categoryId: true, title: true, content: true, steps: true,
-  keywords: true, image: true, pdfFile: true, videoUrl: true, viewCount: true, featured: true,
+  keywords: true, image: true, images: true, pdfFile: true, videoUrl: true, viewCount: true, featured: true,
   publishedAt: true, createdAt: true, updatedAt: true,
   category: { select: { categoryId: true, categoryName: true } },
+}
+
+const PROFANE_PATTERNS = [
+  /ควย/i, /หี/i, /เย็ด/i, /สัส/i, /สัด/i, /เหี้ย/i, /มึง/i, /กู/i,
+  /อีดอก/i, /ดอกทอง/i, /ชาติหมา/i, /พ่อง/i, /แม่ง/i, /ชิบหาย/i, /ฉิบหาย/i,
+  /ระยำ/i, /จัญไร/i, /ตอแหล/i, /เสือก/i, /หัวควย/i, /แตด/i, /เงี่ยน/i,
+  /ชักว่าว/i, /กะหรี่/i, /\bfuck/i, /\bshit/i, /\bbitch/i, /\basshole/i,
+  /\bdick\b/i, /\bpussy\b/i, /\bcunt\b/i, /\bporn\b/i, /\bxxx\b/i,
+]
+
+export function isProfaneSearchTerm(term) {
+  if (typeof term !== 'string') return false
+  const normalized = term.trim().toLowerCase()
+  if (!normalized) return false
+  return PROFANE_PATTERNS.some((pattern) => pattern.test(normalized))
+}
+
+function normalizeArticleImages(article) {
+  if (!article) return article
+  const rawList = Array.isArray(article.images) ? article.images.filter(Boolean) : []
+  const images = rawList.length ? rawList : (article.image ? [article.image] : [])
+  const image = article.image || images[0] || null
+  return { ...article, image, images }
 }
 
 router.get('/settings/contact', async (_req, res, next) => {
@@ -79,7 +102,7 @@ router.get('/articles', async (req, res, next) => {
     }
     const orderBy = req.query.sort === 'popular' ? [{ viewCount: 'desc' }, { publishedAt: 'desc' }] : [{ publishedAt: 'desc' }, { createdAt: 'desc' }]
     const articles = await prisma.article.findMany({ where, orderBy, take: limit, select: articleSelect })
-    res.json(articles)
+    res.json(articles.map(normalizeArticleImages))
   } catch (error) { next(error) }
 })
 
@@ -123,7 +146,7 @@ router.get('/articles/search', async (req, res, next) => {
     }
     if (query && page === 1) {
       const term = query.toLocaleLowerCase('th-TH').trim().slice(0, 120)
-      if (firstHitInWindow(`search:${visitorFingerprint(req)}:${term}`)) {
+      if (!isProfaneSearchTerm(term) && firstHitInWindow(`search:${visitorFingerprint(req)}:${term}`)) {
         prisma.searchLog.create({ data: { term, resultCount: total } }).catch(() => {})
       }
     }
@@ -141,7 +164,7 @@ router.get('/articles/search', async (req, res, next) => {
             ELSE 3 END ASC, a.published_at DESC`
       const rows = await prisma.$queryRaw(Prisma.sql`
         SELECT a.article_id AS "articleId", a.category_id AS "categoryId", a.title,
-          a.content, a.steps, a.keywords, a.image, a.pdf_file AS "pdfFile", a.video_url AS "videoUrl",
+          a.content, a.steps, a.keywords, a.image, a.images, a.pdf_file AS "pdfFile", a.video_url AS "videoUrl",
           a.view_count AS "viewCount", a.featured, a.published_at AS "publishedAt",
           a.created_at AS "createdAt", a.updated_at AS "updatedAt",
           c.category_name AS "categoryName"
@@ -150,9 +173,10 @@ router.get('/articles/search', async (req, res, next) => {
         ORDER BY ${orderClause}
         LIMIT ${pageSize} OFFSET ${skip}
       `)
-      items = rows.map(({ categoryName, ...article }) => ({ ...article, category: { categoryId: article.categoryId, categoryName } }))
+      items = rows.map(({ categoryName, ...article }) => normalizeArticleImages({ ...article, category: { categoryId: article.categoryId, categoryName } }))
     } else {
-      items = await prisma.article.findMany({ where, orderBy, skip, take: pageSize, select: articleSelect })
+      const rawItems = await prisma.article.findMany({ where, orderBy, skip, take: pageSize, select: articleSelect })
+      items = rawItems.map(normalizeArticleImages)
     }
     res.json({ items, total, page, pageSize, pageCount: Math.ceil(total / pageSize) })
   } catch (error) { next(error) }
@@ -201,7 +225,7 @@ router.get('/articles/:id', async (req, res, next) => {
     ])
     const feedbackCount = feedback.reduce((sum, row) => sum + row._count._all, 0)
     const helpfulCount = feedback.find((row) => row.helpful)?._count._all || 0
-    res.json({ ...result, feedbackCount, helpfulCount })
+    res.json({ ...normalizeArticleImages(result), feedbackCount, helpfulCount })
   } catch (error) { next(error) }
 })
 
