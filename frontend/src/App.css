@@ -2538,6 +2538,361 @@ footer::before { top: 0; }
   margin-top: 10px;
 }
 
+/* ---------- 1. Uncropped Article & Card Images + Multi-Image Gallery & Lightbox ---------- */
+.article-art {
+  height: auto;
+  aspect-ratio: 16 / 10;
+  padding: 8px;
+  background: linear-gradient(135deg, #e7f6f9 0%, #d4edf4 100%);
+}
+.article-art img {
+  width: 100%;
+  height: 100%;
+  border-radius: 10px;
+  object-fit: contain;
+  background: #ffffff;
+}
+.image-count-tag {
+  position: absolute;
+  bottom: 12px;
+  right: 12px;
+  z-index: 1;
+  display: inline-flex;
+  min-height: 28px;
+  align-items: center;
+  gap: 5px;
+  padding: 3px 10px;
+  border: 1px solid rgba(255, 255, 255, .5);
+  border-radius: 999px;
+  background: rgba(6, 55, 70, .86);
+  backdrop-filter: blur(6px);
+  color: var(--white);
+  font-size: 12.5px;
+  font-weight: 700;
+  box-shadow: 0 4px 12px rgba(4, 34, 44, .24);
+}
+.detail-gallery-box {
+  margin-bottom: 22px;
+}
+.detail-main .detail-image-button {
+  margin-bottom: 0;
+  padding: 12px;
+  background: linear-gradient(180deg, #ffffff 0%, #f3f9fc 100%);
+}
+.detail-main .detail-image {
+  width: 100%;
+  height: auto;
+  max-height: 620px;
+  margin: 0;
+  border-radius: 12px;
+  object-fit: contain;
+  background: #ffffff;
+}
+.detail-gallery-strip {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(118px, 1fr));
+  gap: 10px;
+  margin-top: 12px;
+  padding: 12px;
+  border: 1px solid var(--line);
+  border-radius: 15px;
+  background: #ffffff;
+  box-shadow: var(--shadow-soft);
+}
+.gallery-thumb-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 6px;
+  padding: 7px;
+  border: 2px solid var(--line);
+  border-radius: 11px;
+  background: var(--surface-muted);
+  transition: transform .18s var(--ease-out), border-color .18s ease, background-color .18s ease, box-shadow .18s ease;
+}
+.gallery-thumb-btn:hover {
+  transform: translateY(-2px);
+  border-color: var(--primary-tint);
+  background: #ffffff;
+}
+.gallery-thumb-btn.active {
+  border-color: var(--accent);
+  background: var(--accent-soft);
+  box-shadow: 0 4px 12px rgba(245, 158, 11, .22);
+}
+.gallery-thumb-btn img {
+  width: 100%;
+  height: 76px;
+  border-radius: 7px;
+  object-fit: contain;
+  background: #ffffff;
+}
+.gallery-thumb-btn small {
+  color: var(--primary-deep);
+  font-size: 12.5px;
+  font-weight: 700;
+}
+.lightbox {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 18px;
+}
+.lightbox-stage {
+  display: flex;
+  max-width: min(1160px, 88vw);
+  max-height: 88vh;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
+}
+.lightbox-stage img {
+  max-width: 100%;
+  max-height: 80vh;
+  border-radius: 12px;
+  object-fit: contain;
+  background: #ffffff;
+  box-shadow: 0 18px 44px rgba(0, 0, 0, .42);
+}
+.lightbox-caption {
+  padding: 5px 14px;
+  border: 1px solid rgba(253, 230, 138, .45);
+  border-radius: 999px;
+  background: rgba(6, 44, 56, .88);
+  color: var(--gold-bright);
+  font-size: 14px;
+  font-weight: 600;
+}
+.lightbox-close {
+  position: absolute;
+  top: 16px;
+  right: 24px;
+  display: grid;
+  width: 44px;
+  height: 44px;
+  place-items: center;
+  border: 1px solid rgba(255, 255, 255, .3);
+  border-radius: 50%;
+  background: rgba(255, 255, 255, .12);
+  color: var(--white);
+  font-size: 28px;
+  line-height: 1;
+}
+.lightbox-close:hover {
+  background: rgba(255, 255, 255, .24);
+}
+.lightbox-nav {
+  display: grid;
+  width: 50px;
+  height: 50px;
+  flex: none;
+  place-items: center;
+  border: 1px solid rgba(253, 230, 138, .5);
+  border-radius: 50%;
+  background: rgba(6, 55, 70, .85);
+  color: var(--gold-bright);
+  font-size: 32px;
+  line-height: 1;
+  transition: transform .18s ease, background-color .18s ease;
+}
+.lightbox-nav:hover {
+  transform: scale(1.08);
+  background: var(--accent);
+  color: var(--primary-strong);
+}
+
+/* ---------- 2. Social Share Buttons (LINE & Facebook) ---------- */
+.share-button {
+  display: inline-flex;
+  min-height: 44px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 8px 15px;
+  border-radius: 9px;
+  font-size: 15px;
+  font-weight: 700;
+  color: #ffffff !important;
+  text-decoration: none;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, .18);
+  transition: transform .18s var(--ease-out), filter .18s ease, box-shadow .18s ease;
+}
+.share-button:hover {
+  transform: translateY(-2px);
+  filter: brightness(1.07);
+  color: #ffffff !important;
+  box-shadow: 0 8px 18px rgba(0, 0, 0, .24);
+}
+.share-line-btn {
+  border: 1px solid #05b34c;
+  background: linear-gradient(135deg, #06c755 0%, #05a847 100%);
+}
+.share-fb-btn {
+  border: 1px solid #166fe5;
+  background: linear-gradient(135deg, #1877f2 0%, #0f62ce 100%);
+}
+
+/* ---------- 3. Admin Multi-Image Upload Grid (1-5 Images) ---------- */
+.image-limit-note {
+  display: block;
+  margin-top: 6px;
+  color: var(--accent-deep);
+  font-size: 13px;
+  font-weight: 600;
+}
+.admin-multi-image-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(175px, 1fr));
+  gap: 12px;
+  margin-top: 12px;
+}
+.admin-image-card {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  padding: 10px;
+  border: 1px solid var(--line-strong);
+  border-radius: 12px;
+  background: #ffffff;
+  box-shadow: var(--shadow-sm);
+}
+.admin-image-card.is-new {
+  border-color: var(--primary);
+  background: #f5fbfd;
+}
+.admin-image-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+.image-slot-badge {
+  display: inline-flex;
+  padding: 2px 8px;
+  border-radius: 999px;
+  background: var(--surface-muted);
+  color: var(--primary-deep);
+  font-size: 12px;
+  font-weight: 700;
+}
+.image-slot-badge.is-primary {
+  background: var(--gold-gradient);
+  color: var(--primary-strong);
+}
+.admin-image-card-head .danger-action {
+  min-height: 28px;
+  padding: 2px 8px;
+  font-size: 12px;
+}
+.admin-image-thumb-wrap {
+  display: flex;
+  height: 125px;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  border: 1px solid var(--line);
+  border-radius: 9px;
+  background: var(--surface-muted);
+}
+.admin-image-thumb-wrap .admin-image-preview {
+  width: 100%;
+  height: 100%;
+  max-height: 125px;
+  margin: 0;
+  object-fit: contain;
+}
+.admin-image-filename {
+  display: block;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* ---------- 4. Monthly Report & Search Term Delete in Dashboard ---------- */
+.monthly-report-panel {
+  border-top: 4px solid var(--accent);
+  background: linear-gradient(180deg, #ffffff 0%, #fafdff 100%);
+}
+.monthly-panel-head {
+  flex-wrap: wrap;
+  gap: 14px;
+}
+.monthly-controls {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+.monthly-export-btn {
+  min-height: 40px;
+  padding: 7px 15px;
+  font-size: 14px;
+  white-space: nowrap;
+}
+.monthly-kpi-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+  margin: 16px 0 20px;
+}
+.monthly-kpi-card {
+  padding: 15px 18px;
+  border: 1px solid var(--line);
+  border-left: 4px solid var(--primary);
+  border-radius: 13px;
+  background: #ffffff;
+  box-shadow: var(--shadow-sm);
+}
+.monthly-kpi-card.is-accent {
+  border-left-color: var(--accent);
+  background: linear-gradient(135deg, #fffdf5 0%, #ffffff 100%);
+}
+.monthly-kpi-card > span {
+  display: block;
+  color: var(--muted);
+  font-size: 13.5px;
+  font-weight: 600;
+}
+.monthly-kpi-card > b {
+  display: block;
+  margin: 4px 0;
+  color: var(--primary-strong);
+  font: 700 28px/1.25 'IBM Plex Sans Thai', sans-serif;
+}
+.monthly-kpi-card > b small {
+  color: var(--primary);
+  font-size: 15px;
+  font-weight: 600;
+}
+.monthly-kpi-card > p {
+  margin: 0;
+  color: var(--muted);
+  font-size: 13px;
+}
+.monthly-subhead {
+  margin-bottom: 10px;
+}
+.monthly-subhead h3 {
+  margin: 0;
+  color: var(--primary-deep);
+  font-size: 16.5px;
+}
+.term-row-actions {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+}
+.delete-term-btn {
+  min-height: 32px !important;
+  padding: 4px 10px !important;
+  border-radius: 999px !important;
+  font-size: 13px !important;
+  font-weight: 600 !important;
+}
+
 /* ---------- Responsive refinements ---------- */
 @media (max-width: 980px) {
   .dashboard-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
