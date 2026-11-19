@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { Link, NavLink, Outlet, Route, Routes, useNavigate, useParams, useSearchParams } from 'react-router-dom'
-import { api, assetUrl, feedbackKey, useDocumentTitle } from './services/api'
+import { api, assetUrl, feedbackKey, parseMediaLink, useDocumentTitle } from './services/api'
 import { AdminLoginPage, AdminPage } from './pages/Admin'
 import { AdminHome, ArticleEditor, ArticleList, CategoryManager, ContactSettings } from './pages/AdminManagement'
 import './App.css'
@@ -117,6 +117,7 @@ function ArticleCard({ article }) {
   return <article className="article-card"><Link className="article-art" to={`/articles/${article.articleId}`} aria-label={`อ่าน ${article.title}`}>
     {article.image ? <img src={assetUrl(article.image)} alt=""/> : <div className="art-placeholder"><span>{article.category?.categoryName || 'คู่มือ ICT'}</span><b>{article.title.slice(0, 1)}</b><i>ICT KNOWLEDGE</i></div>}
     {article.featured && <span className="featured-tag">แนะนำ</span>}
+    {article.videoUrl && <span className="video-tag">▶ วิดีโอ/ลิงก์</span>}
   </Link><div className="article-copy"><div className="article-meta"><span>{article.category?.categoryName || 'ความรู้ทั่วไป'}</span><span>{dateLabel(article.publishedAt || article.createdAt)}</span></div>
     <h3><Link to={`/articles/${article.articleId}`}>{article.title}</Link></h3><p>{excerpt(article.content)}</p><div className="article-bottom"><span>◷ {article.viewCount.toLocaleString('th-TH')} ครั้ง</span><Link to={`/articles/${article.articleId}`}>อ่านเพิ่มเติม <b>→</b></Link></div>
   </div></article>
@@ -217,6 +218,7 @@ function ArticlePage() {
   const paragraphs = (article.content || '').split(/\n{2,}/).filter(Boolean)
   const relatedArticles = (related.data || []).filter((item) => item.articleId !== article.articleId).slice(0, 4)
   const quickHelpHref = contactActionHref(contact.data)
+  const mediaLink = parseMediaLink(article.videoUrl)
   return <main className="article-detail shell">
     {preview && <div className="preview-banner" role="status"><b>โหมดดูตัวอย่างของเจ้าหน้าที่</b><span>การเปิดหน้านี้จะไม่ถูกนับเป็นยอดเข้าชม</span></div>}
 
@@ -233,6 +235,7 @@ function ArticlePage() {
         <div className="article-tools">
           <button className="print-button" onClick={copyLink}>{copied ? '✓ คัดลอกลิงก์แล้ว' : '⧉ คัดลอกลิงก์คู่มือ'}</button>
           <button className="print-button" onClick={() => window.print()}>▤ พิมพ์คู่มือ / บันทึกเป็น PDF</button>
+          {mediaLink && <a className="print-button" href="#article-video">▶ ดูวิดีโอ / ลิงก์ประกอบ</a>}
           {article.pdfFile && <a className="download-button hero-pdf-btn" href={assetUrl(article.pdfFile)} download>⬇ ดาวน์โหลด PDF</a>}
           {copyError && <span role="status">{copyError}</span>}
         </div>
@@ -263,6 +266,33 @@ function ArticlePage() {
         </div>
 
         {steps.length > 0 && <section id="article-steps" className="steps-box"><div className="steps-box-head"><div><span className="eyebrow">STEP-BY-STEP WORKFLOW</span><h2>ขั้นตอนการแก้ไขปัญหาอย่างเป็นลำดับ</h2></div><span className="steps-count-pill">{steps.length} ขั้นตอน</span></div><ol>{steps.map((step, index) => <li key={`step-${index}`}>{typeof step === 'string' ? step.replace(/^\s*\d+[.)]\s*/, '') : step?.text || JSON.stringify(step)}</li>)}</ol></section>}
+
+        {mediaLink && <section id="article-video" className="video-guide-box">
+          <div className="video-guide-head">
+            <div className="video-guide-title">
+              <span className="video-emblem" aria-hidden="true">▶</span>
+              <div>
+                <span className="eyebrow">VIDEO & REFERENCE LINK · {mediaLink.provider}</span>
+                <h2>{mediaLink.type === 'link' ? 'ลิงก์วิดีโอ / แหล่งข้อมูลประกอบบทความ' : 'วิดีโอสาธิตประกอบคู่มือ'}</h2>
+              </div>
+            </div>
+            <a className="download-button video-ext-btn" href={mediaLink.href} target="_blank" rel="noreferrer">↗ เปิดลิงก์บน {mediaLink.provider}</a>
+          </div>
+          {(mediaLink.type === 'youtube' || mediaLink.type === 'gdrive') && <div className="video-frame-wrap">
+            <iframe src={mediaLink.embedUrl} title={`วิดีโอประกอบ ${article.title}`} loading="lazy" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowFullScreen/>
+          </div>}
+          {mediaLink.type === 'video' && <div className="video-frame-wrap">
+            <video controls preload="metadata" src={mediaLink.href}/>
+          </div>}
+          {mediaLink.type === 'link' && <a className="external-link-card" href={mediaLink.href} target="_blank" rel="noreferrer">
+            <span className="ext-link-icon" aria-hidden="true">🔗</span>
+            <div className="ext-link-copy">
+              <b>คลิกเพื่อเปิดวิดีโอหรือลิงก์ข้อมูลประกอบ ({mediaLink.hostname})</b>
+              <small>{mediaLink.href}</small>
+            </div>
+            <span className="ext-link-arrow" aria-hidden="true">↗</span>
+          </a>}
+        </section>}
 
         {article.pdfFile && <section id="article-pdf" className="pdf-banner"><div className="pdf-banner-info"><span className="pdf-emblem" aria-hidden="true">PDF</span><div><b>คู่มือฉบับสมบูรณ์พร้อมพิมพ์ (PDF A4)</b><p>เปิดอ่านในเบราว์เซอร์หรือดาวน์โหลดเก็บไว้ในเครื่องเพื่อเปิดดูแบบออฟไลน์ได้ทันที</p></div></div><div><a className="print-button" href={assetUrl(article.pdfFile)} target="_blank" rel="noreferrer">เปิดอ่านไฟล์ PDF</a><a className="download-button" href={assetUrl(article.pdfFile)} download>⬇ ดาวน์โหลดไฟล์ PDF</a></div></section>}
 
@@ -306,6 +336,7 @@ function ArticlePage() {
             <span className="aside-nav-heading">สารบัญในหน้านี้</span>
             <a href="#article-intro"><i/><span>รายละเอียดและคำอธิบาย</span></a>
             {steps.length > 0 && <a href="#article-steps"><i/><span>ขั้นตอนการปฏิบัติ ({steps.length})</span></a>}
+            {mediaLink && <a href="#article-video"><i/><span>วิดีโอ / ลิงก์ประกอบ</span></a>}
             {article.pdfFile && <a href="#article-pdf"><i/><span>เอกสารคู่มือ PDF</span></a>}
             <a href="#article-feedback"><i/><span>ประเมินความพึงพอใจ</span></a>
           </nav>

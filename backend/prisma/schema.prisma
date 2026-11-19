@@ -43,6 +43,7 @@ model Article {
   keywords    String[]      @default([])
   image       String?       @db.VarChar(1024)
   pdfFile     String?       @map("pdf_file") @db.VarChar(1024)
+  videoUrl    String?       @map("video_url") @db.VarChar(1024)
   viewCount   Int           @default(0) @map("view_count")
   status      ArticleStatus @default(DRAFT)
   featured    Boolean       @default(false)

@@ -39,7 +39,7 @@ function firstHitInWindow(key) {
 const publicArticle = { status: 'PUBLISHED' }
 const articleSelect = {
   articleId: true, categoryId: true, title: true, content: true, steps: true,
-  keywords: true, image: true, pdfFile: true, viewCount: true, featured: true,
+  keywords: true, image: true, pdfFile: true, videoUrl: true, viewCount: true, featured: true,
   publishedAt: true, createdAt: true, updatedAt: true,
   category: { select: { categoryId: true, categoryName: true } },
 }
@@ -141,7 +141,7 @@ router.get('/articles/search', async (req, res, next) => {
             ELSE 3 END ASC, a.published_at DESC`
       const rows = await prisma.$queryRaw(Prisma.sql`
         SELECT a.article_id AS "articleId", a.category_id AS "categoryId", a.title,
-          a.content, a.steps, a.keywords, a.image, a.pdf_file AS "pdfFile",
+          a.content, a.steps, a.keywords, a.image, a.pdf_file AS "pdfFile", a.video_url AS "videoUrl",
           a.view_count AS "viewCount", a.featured, a.published_at AS "publishedAt",
           a.created_at AS "createdAt", a.updated_at AS "updatedAt",
           c.category_name AS "categoryName"

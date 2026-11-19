@@ -332,8 +332,22 @@ function parseArticleInput(body) {
   const status = ['DRAFT', 'PUBLISHED', 'HIDDEN'].includes(body.status) ? body.status : 'DRAFT'
   const keywords = typeof body.keywords === 'string' ? [...new Set(body.keywords.split(',').map((word) => word.trim()).filter(Boolean))].slice(0, 20) : []
   const steps = typeof body.steps === 'string' ? body.steps.split(/\r?\n/).map((step) => step.trim()).filter(Boolean).slice(0, 100) : []
+  const rawVideoUrl = typeof body.videoUrl === 'string' ? body.videoUrl.trim() : ''
+  let videoUrl = null
+  if (rawVideoUrl) {
+    if (rawVideoUrl.length > 1024) return { error: 'ลิงก์วิดีโอหรือลิงก์อ้างอิงต้องยาวไม่เกิน 1,024 ตัวอักษร' }
+    try {
+      const parsedUrl = new URL(rawVideoUrl)
+      if (!['http:', 'https:'].includes(parsedUrl.protocol) || !parsedUrl.hostname || parsedUrl.username || parsedUrl.password) {
+        throw new Error('INVALID_URL')
+      }
+      videoUrl = parsedUrl.href
+    } catch {
+      return { error: 'ลิงก์วิดีโอหรือลิงก์เพิ่มเติมต้องเป็น URL ที่ถูกต้อง (ขึ้นต้นด้วย https:// หรือ http://)' }
+    }
+  }
   if (!title || title.length > 240 || !content || content.length > 100000 || !Number.isInteger(categoryId) || categoryId < 1 || keywords.some((word) => word.length > 80)) return { error: 'กรุณาตรวจชื่อบทความ (ไม่เกิน 240 ตัวอักษร), เนื้อหา, หมวดหมู่ และคำค้น' }
-  return { data: { title, content, categoryId, status, keywords, steps, featured: body.featured === 'true' || body.featured === true } }
+  return { data: { title, content, categoryId, status, keywords, steps, videoUrl, featured: body.featured === 'true' || body.featured === true } }
 }
 
 router.post('/articles', uploadFiles, async (req, res, next) => {
@@ -356,14 +370,19 @@ router.patch('/articles/:id', uploadFiles, async (req, res, next) => {
   if (!Number.isInteger(articleId) || articleId < 1) { await removeNewFiles(req.files); return res.status(400).json({ message: 'รหัสบทความไม่ถูกต้อง' }) }
   if (parsed.error) { await removeNewFiles(req.files); return res.status(400).json({ message: parsed.error }) }
   try {
-    const existing = await prisma.article.findUnique({ where: { articleId }, select: { image: true, pdfFile: true, publishedAt: true } })
+    const existing = await prisma.article.findUnique({ where: { articleId }, select: { image: true, pdfFile: true, videoUrl: true, publishedAt: true } })
     if (!existing) { await removeNewFiles(req.files); return res.status(404).json({ message: 'ไม่พบบทความนี้' }) }
     const category = await prisma.category.findUnique({ where: { categoryId: parsed.data.categoryId }, select: { categoryId: true } })
     if (!category) { await removeNewFiles(req.files); return res.status(400).json({ message: 'ไม่พบหมวดหมู่ที่เลือก' }) }
     const image = optionalUpload(req, 'image') || (req.body.removeImage === 'true' ? null : existing.image)
     const pdfFile = optionalUpload(req, 'pdfFile') || (req.body.removePdf === 'true' ? null : existing.pdfFile)
+    const videoUrl = req.body.removeVideo === 'true'
+      ? null
+      : req.body.videoUrl !== undefined
+        ? parsed.data.videoUrl
+        : existing.videoUrl
     const article = await prisma.article.update({ where: { articleId }, data: {
-      ...parsed.data, image, pdfFile,
+      ...parsed.data, image, pdfFile, videoUrl,
       publishedAt: parsed.data.status === 'PUBLISHED' ? existing.publishedAt || new Date() : existing.publishedAt,
     }, include: { category: { select: { categoryId: true, categoryName: true } } } })
     if (image !== existing.image) await removeStoredUpload(existing.image)

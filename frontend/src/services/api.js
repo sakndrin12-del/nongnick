@@ -101,3 +101,64 @@ export function feedbackKey() {
   }
   return key
 }
+
+export function parseMediaLink(rawUrl) {
+  if (typeof rawUrl !== 'string' || !rawUrl.trim()) return null
+  try {
+    const url = new URL(rawUrl.trim())
+    if (!['http:', 'https:'].includes(url.protocol) || !url.hostname || url.username || url.password) return null
+    const host = url.hostname.toLowerCase().replace(/^www\./, '')
+
+    let ytId = null
+    if (host === 'youtu.be') {
+      ytId = url.pathname.split('/').filter(Boolean)[0] || null
+    } else if (host === 'youtube.com' || host === 'm.youtube.com' || host === 'youtube-nocookie.com') {
+      if (url.pathname === '/watch') {
+        ytId = url.searchParams.get('v')
+      } else {
+        const match = url.pathname.match(/^\/(?:embed|shorts|live|v)\/([a-zA-Z0-9_-]{11})/)
+        if (match) ytId = match[1]
+      }
+    }
+    if (ytId && /^[a-zA-Z0-9_-]{11}$/.test(ytId)) {
+      return {
+        type: 'youtube',
+        href: url.href,
+        embedUrl: `https://www.youtube.com/embed/${ytId}?rel=0`,
+        provider: 'YouTube',
+        hostname: host,
+      }
+    }
+
+    if (host === 'drive.google.com') {
+      const driveMatch = url.pathname.match(/\/file\/d\/([a-zA-Z0-9_-]+)/)
+      if (driveMatch) {
+        return {
+          type: 'gdrive',
+          href: url.href,
+          embedUrl: `https://drive.google.com/file/d/${driveMatch[1]}/preview`,
+          provider: 'Google Drive',
+          hostname: host,
+        }
+      }
+    }
+
+    if (/\.(?:mp4|webm|ogg)$/i.test(url.pathname)) {
+      return {
+        type: 'video',
+        href: url.href,
+        provider: 'วิดีโอ',
+        hostname: host,
+      }
+    }
+
+    return {
+      type: 'link',
+      href: url.href,
+      provider: host.includes('facebook.com') || host.includes('fb.watch') ? 'Facebook Video' : host.includes('tiktok.com') ? 'TikTok' : host,
+      hostname: host,
+    }
+  } catch {
+    return null
+  }
+}
