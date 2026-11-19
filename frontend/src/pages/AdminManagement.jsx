@@ -424,7 +424,7 @@ export default function AdminManagement({ admin, onLogout }) {
   return <main className="admin-page">
     <header className="admin-topbar admin-sidebar">
       <Link className="admin-brand" to="/admin">
-        <span className="brand-mark">ICT</span>
+        <span className="brand-logos" aria-hidden="true"><img className="brand-logo-seal" src="/logo-khonkaen.png" alt=""/><span className="brand-logo-divider"/><img className="brand-logo-ict" src="/logo-ict.png" alt=""/></span>
         <span><b>คลังความรู้ ICT</b><small>พื้นที่เจ้าหน้าที่</small></span>
       </Link>
       <div className="admin-nav-section">

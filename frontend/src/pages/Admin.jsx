@@ -63,7 +63,7 @@ export function AdminLoginPage() {
     <div className="admin-login-shell">
       <aside className="admin-login-showcase" aria-hidden="true">
         <div className="showcase-top">
-          <div className="showcase-kicker"><span className="showcase-dot"/> KKICT STAFF PORTAL · เทศบาลนครขอนแก่น</div>
+          <div className="showcase-kicker"><img className="kicker-seal" src="/logo-khonkaen.png" alt=""/> KKICT STAFF PORTAL · เทศบาลนครขอนแก่น</div>
           <h2>ระบบบริหารจัดการ<br/>คลังความรู้ดิจิทัล</h2>
           <p>พื้นที่ทำงานสำหรับเจ้าหน้าที่ศูนย์พัฒนาทักษะและการเรียนรู้ ICT เพื่อดูแลคู่มือไอทีและติดตามสถิติการใช้งานของประชาชน</p>
         </div>
@@ -127,7 +127,7 @@ export function AdminLoginPage() {
 
       <div className="admin-login-card">
         <div className="login-card-top">
-          <Link className="admin-brand" to="/"><span className="brand-mark">ICT</span><span><b>คลังความรู้ ICT</b><small>ศูนย์พัฒนาทักษะและการเรียนรู้ ICT ขอนแก่น</small></span></Link>
+          <Link className="admin-brand" to="/"><span className="brand-logos" aria-hidden="true"><img className="brand-logo-seal" src="/logo-khonkaen.png" alt=""/><span className="brand-logo-divider"/><img className="brand-logo-ict" src="/logo-ict.png" alt=""/></span><span><b>คลังความรู้ ICT</b><small>ศูนย์พัฒนาทักษะและการเรียนรู้ ICT เทศบาลนครขอนแก่น</small></span></Link>
           <div className="login-mode-tabs" role="tablist" aria-label="โหมดการเข้าใช้งาน">
             <button type="button" role="tab" aria-selected={mode === 'login'} className={mode === 'login' ? 'active' : ''} onClick={() => { setMode('login'); setError('') }}>เข้าสู่ระบบ</button>
             <button type="button" role="tab" aria-selected={mode === 'reset'} className={mode === 'reset' ? 'active' : ''} onClick={() => { setMode('reset'); setError(''); setNotice('') }}>ตั้งรหัสใหม่</button>
