@@ -7,9 +7,51 @@ import multer from 'multer'
 import { prisma } from '../db.js'
 import { requireAdmin } from '../middleware/requireAdmin.js'
 import { CONTACT_FIELDS, CONTACT_SETTING_KEY } from '../contactSettings.js'
+import { isProfaneSearchTerm } from './public.js'
 
 const router = Router()
 router.use(requireAdmin)
+
+const THAI_MONTHS = [
+  'มกราคม', 'กุมภาพันธ์', 'มีนาคม', 'เมษายน', 'พฤษภาคม', 'มิถุนายน',
+  'กรกฎาคม', 'สิงหาคม', 'กันยายน', 'ตุลาคม', 'พฤศจิกายน', 'ธันวาคม',
+]
+const STATUS_THAI = { PUBLISHED: 'เผยแพร่แล้ว', DRAFT: 'ฉบับร่าง', HIDDEN: 'ซ่อนอยู่' }
+
+function formatMonthLabel(yearMonth) {
+  const match = String(yearMonth || '').match(/^(\d{4})-(0[1-9]|1[0-2])$/)
+  if (!match) return yearMonth
+  const year = Number(match[1])
+  const monthIdx = Number(match[2]) - 1
+  return `${THAI_MONTHS[monthIdx]} ${year + 543} (${year})`
+}
+
+function currentBangkokYearMonth() {
+  const parts = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Bangkok', year: 'numeric', month: '2-digit' }).formatToParts(new Date())
+  return `${parts.find((p) => p.type === 'year').value}-${parts.find((p) => p.type === 'month').value}`
+}
+
+function parseYearMonth(raw) {
+  const fallback = currentBangkokYearMonth()
+  const value = typeof raw === 'string' && /^\d{4}-(0[1-9]|1[0-2])$/.test(raw.trim()) ? raw.trim() : fallback
+  const [yearStr, monthStr] = value.split('-')
+  const year = Number(yearStr)
+  const month = Number(monthStr)
+  const startDateUtc = new Date(Date.UTC(year, month - 1, 1))
+  const endDateExclusiveUtc = new Date(Date.UTC(year, month, 1))
+  const bangkokOffsetMs = 7 * 60 * 60 * 1000
+  const startTimestamp = new Date(startDateUtc.getTime() - bangkokOffsetMs)
+  const endTimestampExclusive = new Date(endDateExclusiveUtc.getTime() - bangkokOffsetMs)
+  return { yearMonth: value, year, month, startDateUtc, endDateExclusiveUtc, startTimestamp, endTimestampExclusive }
+}
+
+function normalizeAdminArticle(article) {
+  if (!article) return article
+  const rawList = Array.isArray(article.images) ? article.images.filter(Boolean) : []
+  const images = rawList.length ? rawList : (article.image ? [article.image] : [])
+  const image = article.image || images[0] || null
+  return { ...article, image, images }
+}
 
 function bangkokDay(date) {
   const parts = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Bangkok', year: 'numeric', month: '2-digit', day: '2-digit' }).formatToParts(date)
@@ -29,10 +71,12 @@ router.get('/insights', async (req, res, next) => {
     const searchStart = new Date(startDay.getTime() - bangkokOffsetMs)
     const searchEnd = new Date(endExclusive.getTime() - bangkokOffsetMs)
     const [zeroRows, termRows, dailyRows] = await Promise.all([
-      prisma.searchLog.groupBy({ by: ['term'], where: { createdAt: { gte: searchStart, lt: searchEnd }, resultCount: 0 }, _count: { _all: true }, _max: { createdAt: true }, orderBy: [{ _count: { term: 'desc' } }, { _max: { createdAt: 'desc' } }], take: 10 }),
-      prisma.searchLog.groupBy({ by: ['term'], where: { createdAt: { gte: searchStart, lt: searchEnd } }, _count: { _all: true }, _avg: { resultCount: true }, orderBy: [{ _count: { term: 'desc' } }, { term: 'asc' }], take: 10 }),
+      prisma.searchLog.groupBy({ by: ['term'], where: { createdAt: { gte: searchStart, lt: searchEnd }, resultCount: 0 }, _count: { _all: true }, _max: { createdAt: true }, orderBy: [{ _count: { term: 'desc' } }, { _max: { createdAt: 'desc' } }], take: 25 }),
+      prisma.searchLog.groupBy({ by: ['term'], where: { createdAt: { gte: searchStart, lt: searchEnd } }, _count: { _all: true }, _avg: { resultCount: true }, orderBy: [{ _count: { term: 'desc' } }, { term: 'asc' }], take: 25 }),
       prisma.articleViewDaily.findMany({ where: { day: { gte: startDay, lt: endExclusive } }, select: { day: true, count: true } }),
     ])
+    const filteredZeroRows = zeroRows.filter((row) => !isProfaneSearchTerm(row.term)).slice(0, 10)
+    const filteredTermRows = termRows.filter((row) => !isProfaneSearchTerm(row.term)).slice(0, 10)
     const viewsByDate = new Map()
     for (const row of dailyRows) {
       const key = row.day.toISOString().slice(0, 10)
@@ -49,11 +93,23 @@ router.get('/insights', async (req, res, next) => {
     const articleMap = new Map(articles.map((article) => [article.articleId, article]))
     const topArticlesInRange = articleTotals.map((row) => ({ ...articleMap.get(row.articleId), views: row._sum.count || 0 })).filter((article) => article.articleId)
     res.json({
-      zeroResultTerms: zeroRows.map((row) => ({ term: row.term, count: row._count._all, lastSearched: row._max.createdAt })),
-      topTerms: termRows.map((row) => ({ term: row.term, count: row._count._all, avgResults: Number((row._avg.resultCount || 0).toFixed(1)) })),
+      zeroResultTerms: filteredZeroRows.map((row) => ({ term: row.term, count: row._count._all, lastSearched: row._max.createdAt })),
+      topTerms: filteredTermRows.map((row) => ({ term: row.term, count: row._count._all, avgResults: Number((row._avg.resultCount || 0).toFixed(1)) })),
       viewsByDay,
       topArticlesInRange,
     })
+  } catch (error) { next(error) }
+})
+
+router.delete('/search-logs', async (req, res, next) => {
+  const rawTerm = typeof req.query.term === 'string' ? req.query.term : typeof req.body?.term === 'string' ? req.body.term : ''
+  const term = rawTerm.trim()
+  if (!term || term.length > 120) return res.status(400).json({ message: 'กรุณาระบุคำค้นหาที่ต้องการลบ' })
+  try {
+    const deleted = await prisma.searchLog.deleteMany({
+      where: { term: { equals: term, mode: 'insensitive' } },
+    })
+    res.json({ message: `ลบคำค้นหา “${term}” เรียบร้อยแล้ว`, deletedCount: deleted.count })
   } catch (error) { next(error) }
 })
 
@@ -68,33 +124,41 @@ const storage = multer.diskStorage({
 })
 const upload = multer({
   storage,
-  limits: { files: 2, fileSize: 15 * 1024 * 1024 },
+  limits: { files: 6, fileSize: 15 * 1024 * 1024 },
   fileFilter: (_req, file, done) => {
     const ext = path.extname(file.originalname).toLowerCase()
-    const expected = file.fieldname === 'image' ? IMAGE_TYPES.get(ext) : file.fieldname === 'pdfFile' ? PDF_TYPES.get(ext) : null
+    const isImageField = file.fieldname === 'image' || file.fieldname === 'images'
+    const expected = isImageField ? IMAGE_TYPES.get(ext) : file.fieldname === 'pdfFile' ? PDF_TYPES.get(ext) : null
     if (!expected || expected !== file.mimetype) return done(new multer.MulterError('LIMIT_UNEXPECTED_FILE', file.fieldname))
     done(null, true)
   },
 })
 
 function uploadFiles(req, res, next) {
-  upload.fields([{ name: 'image', maxCount: 1 }, { name: 'pdfFile', maxCount: 1 }])(req, res, async (error) => {
+  upload.fields([{ name: 'image', maxCount: 5 }, { name: 'images', maxCount: 5 }, { name: 'pdfFile', maxCount: 1 }])(req, res, async (error) => {
     if (error) {
       await removeNewFiles(req.files)
-      if (error instanceof multer.MulterError) return res.status(error.code === 'LIMIT_FILE_SIZE' ? 413 : 400).json({ message: 'ไฟล์ไม่ถูกชนิดหรือมีขนาดใหญ่เกินกำหนด (รูปไม่เกิน 5 MB, PDF ไม่เกิน 15 MB)' })
+      if (error instanceof multer.MulterError) return res.status(error.code === 'LIMIT_FILE_SIZE' ? 413 : 400).json({ message: 'ไฟล์ไม่ถูกชนิดหรือมีขนาดใหญ่เกินกำหนด (รูปสูงสุด 5 รูป รูปละไม่เกิน 5 MB, PDF ไม่เกิน 15 MB)' })
       return next(error)
     }
     try {
+      const imageFiles = [...(req.files?.images || []), ...(req.files?.image || [])]
+      if (imageFiles.length > 5) throw Object.assign(new Error('TOO_MANY_IMAGES'), { status: 400 })
       const files = Object.values(req.files || {}).flat()
       for (const file of files) {
-        if (file.fieldname === 'image' && file.size > 5 * 1024 * 1024) throw Object.assign(new Error('IMAGE_TOO_LARGE'), { status: 413 })
+        if ((file.fieldname === 'image' || file.fieldname === 'images') && file.size > 5 * 1024 * 1024) throw Object.assign(new Error('IMAGE_TOO_LARGE'), { status: 413 })
         const bytes = await readMagicBytes(file.path)
         if (!validSignature(file, bytes)) throw Object.assign(new Error('INVALID_FILE_SIGNATURE'), { status: 400 })
       }
       next()
     } catch (validationError) {
       await removeNewFiles(req.files)
-      res.status(validationError.status || 400).json({ message: validationError.status === 413 ? 'รูปภาพต้องมีขนาดไม่เกิน 5 MB' : 'เนื้อหาไฟล์ไม่ตรงกับชนิดไฟล์ที่อนุญาต' })
+      const msg = validationError.status === 413
+        ? 'รูปภาพต้องมีขนาดไม่เกิน 5 MB ต่อรูป'
+        : validationError.message === 'TOO_MANY_IMAGES'
+          ? 'สามารถอัปโหลดรูปภาพประกอบได้สูงสุด 5 รูปต่อบทความ'
+          : 'เนื้อหาไฟล์ไม่ตรงกับชนิดไฟล์ที่อนุญาต'
+      res.status(validationError.status || 400).json({ message: msg })
     }
   })
 }
