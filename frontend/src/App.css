@@ -2249,11 +2249,140 @@ footer::before { top: 0; }
 .recent-article-row > span { display: grid; flex: 1; gap: 3px; }
 .recent-article-row > span > b { color: var(--ink); }
 
+/* ---------- Official ICT Center & Khon Kaen Municipality Logos ---------- */
+.utility-org {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+.utility-seal {
+  width: 24px;
+  height: 24px;
+  flex: none;
+  border-radius: 50%;
+  object-fit: contain;
+  background: #ffffff;
+  padding: 1px;
+  box-shadow: 0 1px 4px rgba(0, 0, 0, .25);
+}
+.brand-logos,
+.footer-logos {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 5px 10px;
+  flex: none;
+  border: 1.5px solid rgba(253, 224, 71, .88);
+  border-radius: 13px;
+  background: #ffffff;
+  box-shadow: 0 0 0 3px rgba(245, 158, 11, .24), 0 4px 12px rgba(4, 34, 44, .18);
+  transition: transform .22s var(--ease-out), box-shadow .22s ease, border-color .22s ease;
+}
+.brand:hover .brand-logos,
+.admin-brand:hover .brand-logos {
+  transform: translateY(-1px) scale(1.03);
+  border-color: var(--gold-bright);
+  box-shadow: 0 0 0 4px rgba(245, 158, 11, .38), 0 6px 16px rgba(4, 34, 44, .24);
+}
+.brand-logo-seal {
+  width: 38px;
+  height: 38px;
+  flex: none;
+  object-fit: contain;
+}
+.brand-logo-divider {
+  width: 1px;
+  height: 28px;
+  flex: none;
+  background: var(--line-strong);
+}
+.brand-logo-ict {
+  height: 36px;
+  width: auto;
+  flex: none;
+  object-fit: contain;
+}
+.admin-sidebar .admin-brand .brand-logos {
+  padding: 4px 8px;
+  gap: 6px;
+}
+.admin-sidebar .admin-brand .brand-logo-seal {
+  width: 30px;
+  height: 30px;
+}
+.admin-sidebar .admin-brand .brand-logo-divider {
+  height: 22px;
+}
+.admin-sidebar .admin-brand .brand-logo-ict {
+  height: 28px;
+}
+.hero-kicker > span {
+  width: auto;
+  height: auto;
+  background: none;
+}
+.kicker-seal {
+  width: 26px;
+  height: 26px;
+  flex: none;
+  object-fit: contain;
+}
+.kicker-ict {
+  height: 24px;
+  width: auto;
+  flex: none;
+  object-fit: contain;
+}
+.window-logo-content {
+  justify-content: center;
+  gap: 10px;
+  padding-inline: 14px;
+}
+.window-logo-seal {
+  width: 58px;
+  height: 58px;
+  flex: none;
+  object-fit: contain;
+  filter: drop-shadow(0 3px 6px rgba(11, 100, 119, .16));
+}
+.window-logo-ict {
+  height: 54px;
+  width: auto;
+  max-width: 98px;
+  flex: none;
+  object-fit: contain;
+}
+.footer-brand-col {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+}
+.footer-logos {
+  margin-bottom: 12px;
+  padding: 6px 12px;
+}
+.footer-logo-seal {
+  width: 44px;
+  height: 44px;
+  flex: none;
+  object-fit: contain;
+}
+.footer-logo-ict {
+  height: 42px;
+  width: auto;
+  flex: none;
+  object-fit: contain;
+}
+
 /* ---------- Responsive refinements ---------- */
 @media (max-width: 980px) {
   .dashboard-cards { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
 @media (max-width: 560px) {
+  .brand-logos { padding: 4px 7px; gap: 6px; }
+  .brand-logo-seal { width: 28px; height: 28px; }
+  .brand-logo-divider { height: 20px; }
+  .brand-logo-ict { height: 26px; }
   .hero-proof { gap: 6px 10px; font-size: 14px; }
   .hero-proof span { margin-left: 0; }
   .site-header::after, footer::before, .admin-topbar::after { height: 4px; }
