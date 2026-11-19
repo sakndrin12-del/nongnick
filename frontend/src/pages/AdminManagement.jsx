@@ -178,20 +178,43 @@ export function AdminHome() {
   const [refresh, setRefresh] = useState(0)
   const { data, loading, error } = useAdminData('/admin/dashboard', refresh)
   const [insightDays, setInsightDays] = useState(30)
+  const [selectedMonth, setSelectedMonth] = useState('')
   const [overviewTab, setOverviewTab] = useState('popular')
-  const insights = useAdminData(`/admin/insights?days=${insightDays}`)
+  const insights = useAdminData(`/admin/insights?days=${insightDays}`, refresh)
+  const monthly = useAdminData(`/admin/reports/monthly${selectedMonth ? `?month=${encodeURIComponent(selectedMonth)}` : ''}`, refresh)
   const [actionError, setActionError] = useState('')
+  const [actionNotice, setActionNotice] = useState('')
   const dashboard = data || {}
+  const monthlyData = monthly.data || null
+  const activeMonth = selectedMonth || monthlyData?.month || ''
   useDocumentTitle('ภาพรวม · ระบบเจ้าหน้าที่')
   async function publishNow(article) {
     setActionError('')
+    setActionNotice('')
     try { await api.patch(`/admin/articles/${article.articleId}/status`, { status: 'PUBLISHED' }); setRefresh((value) => value + 1) }
     catch (err) { setActionError(err.message) }
   }
   async function exportCsv() {
     setActionError('')
-    try { await api.download('/admin/reports/articles.csv', 'รายงานคลังความรู้.csv') }
+    try { await api.download('/admin/reports/articles.csv', 'รายงานคลังความรู้ทั้งหมด.csv') }
     catch (err) { setActionError(err.message) }
+  }
+  async function exportMonthlyCsv() {
+    setActionError('')
+    const monthQuery = activeMonth ? `?month=${encodeURIComponent(activeMonth)}` : ''
+    const fileLabel = activeMonth || 'ประจำเดือน'
+    try { await api.download(`/admin/reports/monthly.csv${monthQuery}`, `รายงานสรุปประจำเดือน-${fileLabel}.csv`) }
+    catch (err) { setActionError(err.message) }
+  }
+  async function removeSearchTerm(term) {
+    if (!term || !window.confirm(`ต้องการลบประวัติคำค้นหา “${term}” ออกจากสถิติใช่หรือไม่?`)) return
+    setActionError('')
+    setActionNotice('')
+    try {
+      const res = await api.delete(`/admin/search-logs?term=${encodeURIComponent(term)}`)
+      setActionNotice(res.message || `ลบคำค้นหา “${term}” แล้ว`)
+      setRefresh((value) => value + 1)
+    } catch (err) { setActionError(err.message) }
   }
   const categoryRows = dashboard.categories || []
   const maxCategoryCount = Math.max(1, ...categoryRows.map((category) => category._count?.articles || 0))
@@ -203,13 +226,14 @@ export function AdminHome() {
       <div>
         <span className="eyebrow">OVERVIEW • ศูนย์พัฒนาทักษะและการเรียนรู้ ICT ขอนแก่น</span>
         <h1>ภาพรวมคลังความรู้</h1>
-        <p className="admin-muted">สรุปสถิติการเข้าชม คำค้นหาของผู้ใช้งาน และสถานะบทความในระบบ</p>
+        <p className="admin-muted">สรุปสถิติการเข้าชม รายงานประจำเดือน คำค้นหาของผู้ใช้งาน และสถานะบทความในระบบ</p>
       </div>
       <div className="dashboard-quick-actions">
-        <button type="button" className="admin-secondary-link" onClick={exportCsv}>⇣ ส่งออก CSV</button>
+        <button type="button" className="admin-secondary-link" onClick={exportCsv}>⇣ ส่งออก CSV ทั้งหมด</button>
         <Link className="admin-primary-link" to="/admin/articles/new">＋ เขียนบทความใหม่</Link>
       </div>
     </div>
+    <Alert type="success">{actionNotice}</Alert>
     <Alert>{error || actionError}</Alert>
     {loading ? <p className="admin-loading">กำลังโหลดข้อมูล...</p> : <>
       <div className="dashboard-cards">
@@ -217,6 +241,83 @@ export function AdminHome() {
         <div><div className="kpi-head"><span>หมวดหมู่ความรู้</span><i className="kpi-icon" aria-hidden="true">▣</i></div><b>{Number(dashboard.categoryCount || 0).toLocaleString('th-TH')}</b><small>กลุ่มหัวข้อบริการและคู่มือไอที</small></div>
         <div><div className="kpi-head"><span>ยอดเข้าชมสะสม</span><i className="kpi-icon" aria-hidden="true">◉</i></div><b>{Number(dashboard.totalViews || 0).toLocaleString('th-TH')}</b><small>จำนวนครั้งที่เปิดอ่านคู่มือทั้งหมด</small></div>
         <div className="satisfaction-card"><div className="kpi-head"><span>อัตราความพึงพอใจ</span><i className="kpi-icon" aria-hidden="true">★</i></div><b>{Number(dashboard.helpfulPercent || 0)}%</b><div className="satisfaction-meter" aria-hidden="true"><span style={{ width: `${Math.min(100, Number(dashboard.helpfulPercent || 0))}%` }}/></div><small>มีประโยชน์ {dashboard.helpfulCount || 0} จาก {dashboard.feedbackCount || 0} โหวต</small></div>
+      </div>
+
+      <div className="dashboard-panel monthly-report-panel">
+        <div className="dashboard-panel-heading monthly-panel-head">
+          <div>
+            <span className="eyebrow">MONTHLY PERFORMANCE REPORT</span>
+            <h2>รายงานสรุปสถิติประจำเดือน {monthlyData?.monthLabel ? `· ${monthlyData.monthLabel}` : ''}</h2>
+          </div>
+          <div className="monthly-controls">
+            <label className="insights-range-picker">
+              เลือกเดือน/ปี
+              <select
+                aria-label="เลือกเดือนและปีของรายงานประจำเดือน"
+                value={activeMonth}
+                onChange={(event) => setSelectedMonth(event.target.value)}
+              >
+                {(monthlyData?.availableMonths || []).map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
+              </select>
+            </label>
+            <button type="button" className="admin-primary-link monthly-export-btn" onClick={exportMonthlyCsv}>
+              ⇣ ดาวน์โหลดรายงานประจำเดือน (Export Monthly CSV)
+            </button>
+          </div>
+        </div>
+        {monthly.loading ? <p className="dashboard-empty">กำลังโหลดรายงานประจำเดือน...</p> : monthly.error ? <p className="dashboard-empty" role="alert">{monthly.error}</p> : monthlyData && <>
+          <div className="monthly-kpi-grid">
+            <div className="monthly-kpi-card">
+              <span>บทความที่เผยแพร่ในเดือนนี้</span>
+              <b>{Number(monthlyData.summary.publishedInMonthCount || 0).toLocaleString('th-TH')} <small>บทความ</small></b>
+              <p>สร้างหรืออัปเดตในเดือนนี้ทั้งหมด {Number(monthlyData.summary.createdInMonthCount || 0).toLocaleString('th-TH')} บทความ</p>
+            </div>
+            <div className="monthly-kpi-card is-accent">
+              <span>ยอดเข้าชมรวมเฉพาะในเดือนนี้</span>
+              <b>{Number(monthlyData.summary.totalViewsInMonth || 0).toLocaleString('th-TH')} <small>ครั้ง</small></b>
+              <p>จากบทความที่มีผู้เปิดอ่านในเดือนนี้ {Number(monthlyData.summary.activeArticlesViewedCount || 0).toLocaleString('th-TH')} บทความ</p>
+            </div>
+            <div className="monthly-kpi-card">
+              <span>การค้นหา & ความพึงพอใจในเดือนนี้</span>
+              <b>{Number(monthlyData.summary.searchesInMonthCount || 0).toLocaleString('th-TH')} <small>ครั้งที่ค้นหา</small></b>
+              <p>ความพึงพอใจ {monthlyData.summary.satisfactionPercentInMonth}% (มีประโยชน์ {monthlyData.summary.feedbackHelpfulInMonth}/{monthlyData.summary.feedbackTotalInMonth} โหวต)</p>
+            </div>
+          </div>
+
+          <div className="monthly-articles-block">
+            <div className="monthly-subhead">
+              <h3>รายชื่อบทความที่สร้าง/เผยแพร่ในเดือน {monthlyData.monthLabel} ({monthlyData.articlesInMonth.length} บทความ)</h3>
+            </div>
+            {monthlyData.articlesInMonth.length ? <div className="admin-table-wrap">
+              <table className="admin-table dashboard-table">
+                <thead>
+                  <tr>
+                    <th>ชื่อบทความ</th>
+                    <th>หมวดหมู่</th>
+                    <th>สถานะ</th>
+                    <th>วันที่เผยแพร่/สร้าง</th>
+                    <th>ยอดวิวในเดือนนี้</th>
+                    <th>ยอดวิวสะสม</th>
+                    <th>สื่อประกอบ</th>
+                    <th>จัดการ</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {monthlyData.articlesInMonth.map((item) => <tr key={item.articleId}>
+                    <td><b>{item.title}</b></td>
+                    <td><span className="category-chip">{item.categoryName}</span></td>
+                    <td><StatusBadge status={item.status}/></td>
+                    <td>{dateLabel(item.publishedAt || item.createdAt)}</td>
+                    <td><b className="metric-num">{Number(item.monthViews || 0).toLocaleString('th-TH')}</b> <small>ครั้ง</small></td>
+                    <td>{Number(item.totalViews || 0).toLocaleString('th-TH')} <small>ครั้ง</small></td>
+                    <td><small>{item.imageCount ? `🖼 ${item.imageCount} รูป` : '—'} · {item.hasPdf ? 'PDF' : '—'} · {item.hasVideo ? '🎬 วิดีโอ' : '—'}</small></td>
+                    <td><div className="admin-row-actions"><Link to={`/articles/${item.articleId}?preview=1`} target="_blank" rel="opener">ดูหน้าเว็บ</Link><Link to={`/admin/articles/${item.articleId}/edit`}>แก้ไข</Link></div></td>
+                  </tr>)}
+                </tbody>
+              </table>
+            </div> : <p className="dashboard-empty">ไม่มีบทความที่สร้างหรือเผยแพร่ในเดือนที่เลือก (สามารถเลือกดูเดือนอื่นได้จากตัวเลือกด้านบน)</p>}
+          </div>
+        </>}
       </div>
 
       <div className="dashboard-panel dashboard-chart-panel">
@@ -230,12 +331,12 @@ export function AdminHome() {
       <div className="dashboard-columns">
         <div className="dashboard-panel">
           <div className="dashboard-panel-heading"><div><span className="eyebrow">NO RESULT SEARCHES</span><h2>คำค้นที่หาไม่เจอ</h2></div><span className="panel-pill panel-pill-warn">โอกาสเขียนคู่มือใหม่</span></div>
-          {insights.loading ? <p className="dashboard-empty">กำลังโหลดสถิติคำค้น...</p> : insights.error ? <p className="dashboard-empty" role="alert">{insights.error}</p> : insights.data?.zeroResultTerms?.length ? <div className="recent-article-list">{insights.data.zeroResultTerms.map((item) => <div className="recent-article-row zero-term-row" key={item.term}><span><b>“{item.term}”</b><small>ค้นหา {item.count.toLocaleString('th-TH')} ครั้ง · ล่าสุด {dateLabel(item.lastSearched)}</small></span><Link className="write-guide-btn" to={`/admin/articles/new?title=${encodeURIComponent(item.term)}`}>＋ เขียนคู่มือนี้</Link></div>)}</div> : <p className="dashboard-empty">ยังไม่มีคำค้นที่ไม่พบผลลัพธ์</p>}
+          {insights.loading ? <p className="dashboard-empty">กำลังโหลดสถิติคำค้น...</p> : insights.error ? <p className="dashboard-empty" role="alert">{insights.error}</p> : insights.data?.zeroResultTerms?.length ? <div className="recent-article-list">{insights.data.zeroResultTerms.map((item) => <div className="recent-article-row zero-term-row" key={item.term}><span><b>“{item.term}”</b><small>ค้นหา {item.count.toLocaleString('th-TH')} ครั้ง · ล่าสุด {dateLabel(item.lastSearched)}</small></span><div className="term-row-actions"><Link className="write-guide-btn" to={`/admin/articles/new?title=${encodeURIComponent(item.term)}`}>＋ เขียนคู่มือนี้</Link><button type="button" className="danger-action delete-term-btn" onClick={() => removeSearchTerm(item.term)} aria-label={`ลบคำค้นหา ${item.term}`}>ลบ</button></div></div>)}</div> : <p className="dashboard-empty">ยังไม่มีคำค้นที่ไม่พบผลลัพธ์</p>}
         </div>
 
         <div className="dashboard-panel">
           <div className="dashboard-panel-heading"><div><span className="eyebrow">POPULAR SEARCH TERMS</span><h2>คำค้นยอดนิยม</h2></div><span className="panel-pill">{insightDays} วันล่าสุด</span></div>
-          {insights.loading ? <p className="dashboard-empty">กำลังโหลดคำค้นยอดนิยม...</p> : insights.error ? <p className="dashboard-empty" role="alert">{insights.error}</p> : insights.data?.topTerms?.length ? <div className="admin-table-wrap"><table className="admin-table dashboard-table dashboard-compact-table"><thead><tr><th>คำค้น</th><th>ความถี่</th><th>ผลลัพธ์เฉลี่ย</th></tr></thead><tbody>{insights.data.topTerms.map((item, idx) => <tr key={item.term}><td><span className={`rank-badge rank-${idx + 1}`}>{idx + 1}</span> <b>{item.term}</b></td><td><div className="term-bar-cell"><b>{item.count.toLocaleString('th-TH')} ครั้ง</b><div className="progress-track"><span style={{ width: `${Math.max(10, Math.round(item.count * 100 / maxTopTermCount))}%` }}/></div></div></td><td><span className={`result-count-pill${item.avgResults === 0 ? ' is-zero' : ''}`}>{item.avgResults.toLocaleString('th-TH')} บทความ</span></td></tr>)}</tbody></table></div> : <p className="dashboard-empty">ยังไม่มีข้อมูลคำค้น</p>}
+          {insights.loading ? <p className="dashboard-empty">กำลังโหลดคำค้นยอดนิยม...</p> : insights.error ? <p className="dashboard-empty" role="alert">{insights.error}</p> : insights.data?.topTerms?.length ? <div className="admin-table-wrap"><table className="admin-table dashboard-table dashboard-compact-table"><thead><tr><th>คำค้น</th><th>ความถี่</th><th>ผลลัพธ์เฉลี่ย</th><th>จัดการ</th></tr></thead><tbody>{insights.data.topTerms.map((item, idx) => <tr key={item.term}><td><span className={`rank-badge rank-${idx + 1}`}>{idx + 1}</span> <b>{item.term}</b></td><td><div className="term-bar-cell"><b>{item.count.toLocaleString('th-TH')} ครั้ง</b><div className="progress-track"><span style={{ width: `${Math.max(10, Math.round(item.count * 100 / maxTopTermCount))}%` }}/></div></div></td><td><span className={`result-count-pill${item.avgResults === 0 ? ' is-zero' : ''}`}>{item.avgResults.toLocaleString('th-TH')} บทความ</span></td><td><button type="button" className="danger-action delete-term-btn" onClick={() => removeSearchTerm(item.term)} aria-label={`ลบคำค้นหา ${item.term}`}>ลบ</button></td></tr>)}</tbody></table></div> : <p className="dashboard-empty">ยังไม่มีข้อมูลคำค้น</p>}
         </div>
       </div>
 
@@ -312,7 +413,7 @@ export function ArticleList() {
   return <section className="admin-content"><div className="admin-title-row"><div><span className="eyebrow">CONTENT MANAGEMENT</span><h1>จัดการบทความ</h1><p className="admin-muted">ดูแลบทความ คู่มือ และสถานะการเผยแพร่</p></div><Link className="admin-primary-link" to="/admin/articles/new">＋ เพิ่มบทความ</Link></div><Alert type="success">{notice}</Alert><Alert>{actionError || error}</Alert>
     <div className="admin-filter-row"><div className="admin-tabs">{[['ALL', 'ทั้งหมด'], ['PUBLISHED', 'เผยแพร่แล้ว'], ['DRAFT', 'ฉบับร่าง'], ['HIDDEN', 'ซ่อน']].map(([value, label]) => <button key={value} className={status === value ? 'active' : ''} onClick={() => { setStatus(value); setPage(1); setNotice(''); setActionError('') }}>{label}</button>)}</div><span>{totalCount} บทความ</span></div><div className="admin-search-filters"><input aria-label="ค้นหาบทความ" placeholder="ค้นหาชื่อ เนื้อหา หรือคำสำคัญ" value={query} onChange={(event) => { setQuery(event.target.value); setPage(1) }}/><select aria-label="กรองหมวดหมู่" value={categoryId} onChange={(event) => { setCategoryId(event.target.value); setPage(1) }}><option value="">ทุกหมวดหมู่</option>{(categoriesData.data || []).map((category) => <option key={category.categoryId} value={category.categoryId}>{category.categoryName}</option>)}</select></div>
     {loading ? <p className="admin-loading">กำลังโหลดบทความ...</p> : !totalCount ? <div className="admin-empty"><b>ไม่พบบทความในรายการนี้</b><p>ปรับตัวกรองหรือเพิ่มบทความใหม่</p><Link to="/admin/articles/new">เพิ่มบทความ →</Link></div> : <>
-      <div className="admin-table-wrap"><table className="admin-table"><thead><tr><th>บทความ</th><th>หมวดหมู่</th><th>สถานะ</th><th>ยอดวิว</th><th>ผลประเมิน</th><th>ไฟล์แนบ</th><th>อัปเดตล่าสุด</th><th>การจัดการ</th></tr></thead><tbody>{pagedArticles.map((article) => <tr key={article.articleId}><td><b>{article.title}</b></td><td>{article.category?.categoryName || '—'}</td><td><StatusBadge status={article.status}/></td><td>{Number(article.viewCount || 0).toLocaleString('th-TH')}</td><td>{article.feedbackCount ? `${article.helpfulPercent}% (${article.helpfulCount}/${article.feedbackCount})` : 'ยังไม่มีผลประเมิน'}</td><td><span title={article.image ? 'มีรูปภาพ' : 'ไม่มีรูปภาพ'}>{article.image ? '🖼 รูป' : '—'}</span> · <span title={article.pdfFile ? 'มีไฟล์ PDF' : 'ไม่มีไฟล์ PDF'}>{article.pdfFile ? 'PDF' : '—'}</span> · <span title={article.videoUrl ? article.videoUrl : 'ไม่มีลิงก์วิดีโอ'}>{article.videoUrl ? '🎬 วิดีโอ/ลิงก์' : '—'}</span></td><td>{dateLabel(article.updatedAt)}</td><td><div className="admin-row-actions article-row-actions"><div className="admin-row-action-group"><Link to={`/articles/${article.articleId}?preview=1`} target="_blank" rel="opener">ดูตัวอย่าง</Link><Link to={`/admin/articles/${article.articleId}/edit`}>แก้ไข</Link></div><div className="admin-row-action-group">{[['PUBLISHED','เผยแพร่'], ['DRAFT','ฉบับร่าง'], ['HIDDEN','ซ่อน']].filter(([nextStatus]) => nextStatus !== article.status).map(([nextStatus, label]) => <button key={nextStatus} className={`status-action status-action-${nextStatus.toLowerCase()}`} onClick={() => setArticleStatus(article, nextStatus)}>{label}</button>)}<button className="danger-action" onClick={() => removeArticle(article)}>ลบ</button></div></div></td></tr>)}</tbody></table></div>
+      <div className="admin-table-wrap"><table className="admin-table"><thead><tr><th>บทความ</th><th>หมวดหมู่</th><th>สถานะ</th><th>ยอดวิว</th><th>ผลประเมิน</th><th>ไฟล์แนบ</th><th>อัปเดตล่าสุด</th><th>การจัดการ</th></tr></thead><tbody>{pagedArticles.map((article) => { const imgCount = Array.isArray(article.images) && article.images.length ? article.images.length : (article.image ? 1 : 0); return <tr key={article.articleId}><td><b>{article.title}</b></td><td>{article.category?.categoryName || '—'}</td><td><StatusBadge status={article.status}/></td><td>{Number(article.viewCount || 0).toLocaleString('th-TH')}</td><td>{article.feedbackCount ? `${article.helpfulPercent}% (${article.helpfulCount}/${article.feedbackCount})` : 'ยังไม่มีผลประเมิน'}</td><td><span title={imgCount ? `มีรูปภาพ ${imgCount} รูป` : 'ไม่มีรูปภาพ'}>{imgCount ? `🖼 ${imgCount} รูป` : '—'}</span> · <span title={article.pdfFile ? 'มีไฟล์ PDF' : 'ไม่มีไฟล์ PDF'}>{article.pdfFile ? 'PDF' : '—'}</span> · <span title={article.videoUrl ? article.videoUrl : 'ไม่มีลิงก์วิดีโอ'}>{article.videoUrl ? '🎬 วิดีโอ/ลิงก์' : '—'}</span></td><td>{dateLabel(article.updatedAt)}</td><td><div className="admin-row-actions article-row-actions"><div className="admin-row-action-group"><Link to={`/articles/${article.articleId}?preview=1`} target="_blank" rel="opener">ดูตัวอย่าง</Link><Link to={`/admin/articles/${article.articleId}/edit`}>แก้ไข</Link></div><div className="admin-row-action-group">{[['PUBLISHED','เผยแพร่'], ['DRAFT','ฉบับร่าง'], ['HIDDEN','ซ่อน']].filter(([nextStatus]) => nextStatus !== article.status).map(([nextStatus, label]) => <button key={nextStatus} className={`status-action status-action-${nextStatus.toLowerCase()}`} onClick={() => setArticleStatus(article, nextStatus)}>{label}</button>)}<button className="danger-action" onClick={() => removeArticle(article)}>ลบ</button></div></div></td></tr> })}</tbody></table></div>
       <div className="admin-pagination" aria-label="การแบ่งหน้ารายการบทความ">
         <div className="admin-page-summary">
           <span>แสดง <b>{startIndex + 1}–{Math.min(startIndex + pageSize, totalCount)}</b> จากทั้งหมด <b>{totalCount}</b> บทความ</span>
@@ -350,17 +451,50 @@ function ArticleForm({ article }) {
     content: article?.content || '', steps: Array.isArray(article?.steps) ? article.steps.join('\n') : '',
     keywords: article?.keywords?.join(', ') || '', videoUrl: article?.videoUrl || '',
     status: article?.status || 'DRAFT', featured: Boolean(article?.featured),
-    removeImage: false, removePdf: false,
+    removePdf: false,
   }))
-  const [imageFile, setImageFile] = useState(null)
+  const [keptImages, setKeptImages] = useState(() => {
+    const list = Array.isArray(article?.images) && article.images.length ? article.images.filter(Boolean) : (article?.image ? [article.image] : [])
+    return list.slice(0, 5)
+  })
+  const [newImageFiles, setNewImageFiles] = useState([])
   const [pdfFile, setPdfFile] = useState(null)
   useDocumentTitle(editing ? 'แก้ไขบทความ · ระบบเจ้าหน้าที่' : 'เพิ่มบทความ · ระบบเจ้าหน้าที่')
-  const imagePreview = useMemo(() => imageFile ? URL.createObjectURL(imageFile) : '', [imageFile])
+  const newImagePreviews = useMemo(() => newImageFiles.map((file) => ({ name: file.name, url: URL.createObjectURL(file) })), [newImageFiles])
   const mediaPreview = useMemo(() => parseMediaLink(form.videoUrl), [form.videoUrl])
-  useEffect(() => () => { if (imagePreview) URL.revokeObjectURL(imagePreview) }, [imagePreview])
+  useEffect(() => () => { newImagePreviews.forEach((item) => URL.revokeObjectURL(item.url)) }, [newImagePreviews])
   const setField = (field) => (event) => setForm((value) => ({ ...value, [field]: event.target.type === 'checkbox' ? event.target.checked : event.target.value }))
   function appendTemplate(field, template) {
     setForm((value) => ({ ...value, [field]: `${value[field].trimEnd()}${value[field].trim() ? '\n\n' : ''}${template}` }))
+  }
+  const totalImagesCount = keptImages.length + newImageFiles.length
+  const remainingImageSlots = Math.max(0, 5 - totalImagesCount)
+
+  function handleSelectImages(event) {
+    const selected = Array.from(event.target.files || [])
+    event.target.value = ''
+    if (!selected.length) return
+    setError('')
+    const oversize = selected.find((file) => file.size > 5 * 1024 * 1024)
+    if (oversize) {
+      setError(`ไฟล์รูปภาพ “${oversize.name}” มีขนาดเกิน 5 MB`)
+      return
+    }
+    const available = Math.max(0, 5 - keptImages.length - newImageFiles.length)
+    if (selected.length > available) {
+      setError('สามารถแนบรูปภาพประกอบได้สูงสุดไม่เกิน 5 รูปต่อบทความ')
+    }
+    if (available > 0) {
+      setNewImageFiles((prev) => [...prev, ...selected.slice(0, available)])
+    }
+  }
+
+  function removeExistingImage(imgPath) {
+    setKeptImages((prev) => prev.filter((item) => item !== imgPath))
+  }
+
+  function removeNewImage(index) {
+    setNewImageFiles((prev) => prev.filter((_, idx) => idx !== index))
   }
 
   async function submit(event) {
@@ -369,7 +503,9 @@ function ArticleForm({ article }) {
     setError('')
     const body = new FormData()
     Object.entries(form).forEach(([key, value]) => body.append(key, typeof value === 'boolean' ? String(value) : value))
-    if (imageFile) body.append('image', imageFile)
+    body.append('keptImages', JSON.stringify(keptImages))
+    body.append('removeImage', String(keptImages.length === 0 && newImageFiles.length === 0))
+    newImageFiles.forEach((file) => body.append('images', file))
     if (pdfFile) body.append('pdfFile', pdfFile)
     try {
       if (editing) await api.patch(`/admin/articles/${article.articleId}`, body)
@@ -381,7 +517,46 @@ function ArticleForm({ article }) {
 
   return <section className="admin-content"><div className="admin-title-row"><div><span className="eyebrow">ARTICLE EDITOR</span><h1>{editing ? 'แก้ไขบทความ' : 'เพิ่มบทความ'}</h1><p className="admin-muted">กรอกเนื้อหาและเลือกสถานะก่อนบันทึก</p></div><Link className="admin-secondary-link" to="/admin/articles">← กลับ</Link></div><Alert>{error}</Alert>
     <form className="admin-form" onSubmit={submit}><label>ชื่อบทความ <input required maxLength={240} value={form.title} onChange={setField('title')} placeholder="เช่น วิธีเชื่อมต่อ Wi-Fi ของศูนย์"/></label><div className="admin-form-grid"><label>หมวดหมู่<select required value={form.categoryId} onChange={setField('categoryId')} disabled={categoriesLoading}><option value="">เลือกหมวดหมู่</option>{(categories || []).map((category) => <option key={category.categoryId} value={category.categoryId}>{category.categoryName}</option>)}</select></label><label>สถานะ<select value={form.status} onChange={setField('status')}><option value="DRAFT">ฉบับร่าง</option><option value="PUBLISHED">เผยแพร่</option><option value="HIDDEN">ซ่อน</option></select></label></div><label>เนื้อหาบทความ<div className="editor-tools"><button type="button" onClick={() => appendTemplate('content', 'เกริ่นนำ\n')}>เพิ่มหัวข้อเกริ่นนำ</button><button type="button" onClick={() => appendTemplate('content', 'ข้อควรทราบ\n')}>เพิ่มหัวข้อย่อย</button></div><textarea required rows={11} maxLength={100000} value={form.content} onChange={setField('content')} placeholder="อธิบายปัญหาและวิธีแก้ไข..."/></label><label>ขั้นตอนการแก้ไข <small>ใส่หนึ่งขั้นตอนต่อหนึ่งบรรทัด</small><div className="editor-tools"><button type="button" onClick={() => appendTemplate('steps', 'ขั้นตอนใหม่')}>เพิ่มขั้นตอนถัดไป</button></div><textarea rows={7} value={form.steps} onChange={setField('steps')} placeholder={'ตรวจสอบการเชื่อมต่อ\nรีสตาร์ตอุปกรณ์\nทดลองเชื่อมต่ออีกครั้ง'}/></label><label>คำค้น <small>คั่นแต่ละคำด้วยเครื่องหมายจุลภาค</small><input value={form.keywords} onChange={setField('keywords')} placeholder="wifi, เครือข่าย, อินเทอร์เน็ต"/></label>
-      <div className="admin-form-grid"><div className="admin-file-field"><label>ภาพประกอบ <small>JPG, PNG หรือ WebP · ไม่เกิน 5 MB</small><input type="file" accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp" onChange={(event) => { setImageFile(event.target.files?.[0] || null); setForm((value) => ({ ...value, removeImage: false })) }}/></label>{imageFile && <div className="selected-file-row"><span>ไฟล์ที่เลือก: {imageFile.name}</span><button type="button" onClick={() => setImageFile(null)}>นำออก</button></div>}{imagePreview ? <img className="admin-image-preview" src={imagePreview} alt="ตัวอย่างภาพที่จะอัปโหลด"/> : article?.image && !form.removeImage && <img className="admin-image-preview" src={assetUrl(article.image)} alt="ภาพประกอบปัจจุบัน"/>}{article?.image && <div className="current-file">ไฟล์ปัจจุบัน: <a href={assetUrl(article.image)} target="_blank" rel="noreferrer">ดูภาพ</a><label className="inline-check"><input type="checkbox" checked={form.removeImage} onChange={setField('removeImage')}/> ลบรูปภาพเดิม</label>{form.removeImage && <span className="file-removed-label">เลือกเพื่อลบเมื่อบันทึก</span>}</div>}</div><div className="admin-file-field"><label>คู่มือ PDF <small>PDF · ไม่เกิน 15 MB</small><input type="file" accept="application/pdf,.pdf" onChange={(event) => { setPdfFile(event.target.files?.[0] || null); setForm((value) => ({ ...value, removePdf: false })) }}/></label>{pdfFile && <div className="selected-file-row"><span>ไฟล์ที่เลือก: {pdfFile.name}</span><button type="button" onClick={() => setPdfFile(null)}>นำออก</button></div>}{article?.pdfFile && <div className="current-file">ไฟล์ PDF เดิม: <a href={assetUrl(article.pdfFile)} target="_blank" rel="noreferrer">เปิด PDF</a><label className="inline-check"><input type="checkbox" checked={form.removePdf} onChange={setField('removePdf')}/> ลบไฟล์ PDF เดิม</label>{form.removePdf && <span className="file-removed-label">เลือกเพื่อลบเมื่อบันทึก</span>}</div>}</div></div>
+      <div className="admin-form-grid">
+        <div className="admin-file-field">
+          <label>
+            ภาพประกอบบทความ ({totalImagesCount}/5 รูป) <small>JPG, PNG หรือ WebP · สูงสุด 5 รูป (ไม่เกินรูปละ 5 MB · รูปที่ 1 จะใช้เป็นรูปปกหลัก)</small>
+            <input
+              type="file"
+              multiple
+              disabled={remainingImageSlots === 0}
+              accept="image/jpeg,image/png,image/webp,.jpg,.jpeg,.png,.webp"
+              onChange={handleSelectImages}
+            />
+          </label>
+          {remainingImageSlots === 0 && <small className="image-limit-note">ครบจำนวนสูงสุด 5 รูปแล้ว (ลบรูปบางส่วนออกหากต้องการเปลี่ยนรูปใหม่)</small>}
+          {(keptImages.length > 0 || newImagePreviews.length > 0) && <div className="admin-multi-image-grid">
+            {keptImages.map((imgPath, idx) => <div className="admin-image-card" key={`kept-${imgPath}`}>
+              <div className="admin-image-card-head">
+                <span className={`image-slot-badge${idx === 0 ? ' is-primary' : ''}`}>{idx === 0 ? '★ รูปปกหลัก (รูปที่ 1)' : `รูปที่ ${idx + 1}`}</span>
+                <button type="button" className="danger-action" onClick={() => removeExistingImage(imgPath)}>× ลบรูปนี้</button>
+              </div>
+              <a href={assetUrl(imgPath)} target="_blank" rel="noreferrer" className="admin-image-thumb-wrap">
+                <img className="admin-image-preview" src={assetUrl(imgPath)} alt={`รูปประกอบที่ ${idx + 1}`}/>
+              </a>
+            </div>)}
+            {newImagePreviews.map((item, idx) => {
+              const slotNum = keptImages.length + idx + 1
+              return <div className="admin-image-card is-new" key={`new-${item.url}`}>
+                <div className="admin-image-card-head">
+                  <span className={`image-slot-badge${slotNum === 1 ? ' is-primary' : ''}`}>{slotNum === 1 ? '★ รูปปกหลักใหม่ (รูปที่ 1)' : `รูปใหม่ (รูปที่ ${slotNum})`}</span>
+                  <button type="button" className="danger-action" onClick={() => removeNewImage(idx)}>× นำออก</button>
+                </div>
+                <div className="admin-image-thumb-wrap">
+                  <img className="admin-image-preview" src={item.url} alt={`ตัวอย่างรูปใหม่ ${item.name}`}/>
+                </div>
+                <small className="admin-image-filename" title={item.name}>{item.name}</small>
+              </div>
+            })}
+          </div>}
+        </div>
+        <div className="admin-file-field"><label>คู่มือ PDF <small>PDF · 1 ไฟล์ ไม่เกิน 15 MB</small><input type="file" accept="application/pdf,.pdf" onChange={(event) => { setPdfFile(event.target.files?.[0] || null); setForm((value) => ({ ...value, removePdf: false })) }}/></label>{pdfFile && <div className="selected-file-row"><span>ไฟล์ที่เลือก: {pdfFile.name}</span><button type="button" onClick={() => setPdfFile(null)}>นำออก</button></div>}{article?.pdfFile && <div className="current-file">ไฟล์ PDF เดิม: <a href={assetUrl(article.pdfFile)} target="_blank" rel="noreferrer">เปิด PDF</a><label className="inline-check"><input type="checkbox" checked={form.removePdf} onChange={setField('removePdf')}/> ลบไฟล์ PDF เดิม</label>{form.removePdf && <span className="file-removed-label">เลือกเพื่อลบเมื่อบันทึก</span>}</div>}</div>
+      </div>
       <div className="admin-file-field admin-video-field">
         <label>วิดีโอประกอบบทความ / ลิงก์อ้างอิงเพิ่มเติม <small>ไม่บังคับ · รองรับ YouTube, Google Drive, ไฟล์วิดีโอ (.mp4) หรือลิงก์เว็บไซต์ https://</small>
           <div className="admin-video-input-row">
