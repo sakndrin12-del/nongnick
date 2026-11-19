@@ -7,8 +7,8 @@ const username = (argUsername ?? process.env.ADMIN_INITIAL_USERNAME)?.trim()
 const fullname = (argFullname ?? process.env.ADMIN_INITIAL_FULLNAME)?.trim()
 const password = argPassword ?? process.env.ADMIN_INITIAL_PASSWORD
 
-if (!username || username.length > 80 || !fullname || fullname.length > 160 || !password || password.length < 12 || password.length > 200) {
-  console.error('Set ADMIN_INITIAL_USERNAME, ADMIN_INITIAL_FULLNAME, and an ADMIN_INITIAL_PASSWORD of 12–200 characters in backend/.env.')
+if (!username || username.length > 80 || !fullname || fullname.length > 160 || !password || password.length < 8 || password.length > 200) {
+  console.error('Set username (<=80), fullname (<=160), and password of 8–200 characters via CLI args or backend/.env.')
   process.exitCode = 1
 } else {
   try {
