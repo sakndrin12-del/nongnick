@@ -271,6 +271,214 @@ router.get('/dashboard', async (_req, res, next) => {
   } catch (error) { next(error) }
 })
 
+function quoteCsv(value) {
+  const text = String(value ?? '')
+  const safe = /^[=+\-@\t\r]/.test(text) ? `'${text}` : text
+  return `"${safe.replaceAll('"', '""')}"`
+}
+
+async function buildMonthlyReportData(rawMonth) {
+  const { yearMonth, startDateUtc, endDateExclusiveUtc, startTimestamp, endTimestampExclusive } = parseYearMonth(rawMonth)
+  const [
+    articlesInMonthRaw,
+    dailyViewsInMonth,
+    searchCountInMonth,
+    feedbackInMonthRows,
+    allArticleDates,
+    allDailyViewDates,
+  ] = await Promise.all([
+    prisma.article.findMany({
+      where: {
+        OR: [
+          { publishedAt: { gte: startTimestamp, lt: endTimestampExclusive } },
+          { createdAt: { gte: startTimestamp, lt: endTimestampExclusive } },
+        ],
+      },
+      orderBy: [{ publishedAt: 'desc' }, { createdAt: 'desc' }],
+      include: { category: { select: { categoryId: true, categoryName: true } } },
+    }),
+    prisma.articleViewDaily.groupBy({
+      by: ['articleId'],
+      where: { day: { gte: startDateUtc, lt: endDateExclusiveUtc } },
+      _sum: { count: true },
+      orderBy: { _sum: { count: 'desc' } },
+    }),
+    prisma.searchLog.count({
+      where: { createdAt: { gte: startTimestamp, lt: endTimestampExclusive } },
+    }),
+    prisma.articleFeedback.groupBy({
+      by: ['helpful'],
+      where: { createdAt: { gte: startTimestamp, lt: endTimestampExclusive } },
+      _count: { _all: true },
+    }),
+    prisma.article.findMany({ select: { publishedAt: true, createdAt: true } }),
+    prisma.articleViewDaily.findMany({ select: { day: true }, distinct: ['day'] }),
+  ])
+
+  const monthViewByArticle = new Map(dailyViewsInMonth.map((row) => [row.articleId, row._sum.count || 0]))
+  const totalViewsInMonth = dailyViewsInMonth.reduce((sum, row) => sum + (row._sum.count || 0), 0)
+
+  const feedbackTotalInMonth = feedbackInMonthRows.reduce((sum, row) => sum + row._count._all, 0)
+  const feedbackHelpfulInMonth = feedbackInMonthRows.find((row) => row.helpful)?._count._all || 0
+  const satisfactionPercentInMonth = feedbackTotalInMonth ? Math.round(feedbackHelpfulInMonth * 100 / feedbackTotalInMonth) : 0
+
+  const articlesInMonth = articlesInMonthRaw.map((raw) => {
+    const article = normalizeAdminArticle(raw)
+    return {
+      articleId: article.articleId,
+      title: article.title,
+      status: article.status,
+      categoryName: article.category?.categoryName || '—',
+      publishedAt: article.publishedAt,
+      createdAt: article.createdAt,
+      updatedAt: article.updatedAt,
+      monthViews: monthViewByArticle.get(article.articleId) || 0,
+      totalViews: article.viewCount || 0,
+      imageCount: article.images.length,
+      hasPdf: Boolean(article.pdfFile),
+      hasVideo: Boolean(article.videoUrl),
+    }
+  })
+
+  const publishedInMonthCount = articlesInMonth.filter((item) => item.status === 'PUBLISHED').length
+
+  const topViewedIds = dailyViewsInMonth.slice(0, 10).map((row) => row.articleId)
+  const topViewedArticlesRaw = topViewedIds.length
+    ? await prisma.article.findMany({
+      where: { articleId: { in: topViewedIds } },
+      select: { articleId: true, title: true, status: true, viewCount: true, category: { select: { categoryName: true } } },
+    })
+    : []
+  const topViewedMap = new Map(topViewedArticlesRaw.map((a) => [a.articleId, a]))
+  const topViewedInMonth = dailyViewsInMonth
+    .slice(0, 10)
+    .map((row) => {
+      const a = topViewedMap.get(row.articleId)
+      if (!a) return null
+      return {
+        articleId: a.articleId,
+        title: a.title,
+        categoryName: a.category?.categoryName || '—',
+        status: a.status,
+        monthViews: row._sum.count || 0,
+        totalViews: a.viewCount || 0,
+      }
+    })
+    .filter(Boolean)
+
+  const monthSet = new Set([yearMonth, currentBangkokYearMonth()])
+  const nowParts = currentBangkokYearMonth().split('-').map(Number)
+  for (let i = 0; i < 12; i += 1) {
+    const d = new Date(Date.UTC(nowParts[0], nowParts[1] - 1 - i, 1))
+    monthSet.add(d.toISOString().slice(0, 7))
+  }
+  const toBkkYm = (date) => {
+    if (!date) return null
+    const parts = new Intl.DateTimeFormat('en-CA', { timeZone: 'Asia/Bangkok', year: 'numeric', month: '2-digit' }).formatToParts(date)
+    return `${parts.find((p) => p.type === 'year').value}-${parts.find((p) => p.type === 'month').value}`
+  }
+  for (const row of allArticleDates) {
+    if (row.publishedAt) monthSet.add(toBkkYm(row.publishedAt))
+    if (row.createdAt) monthSet.add(toBkkYm(row.createdAt))
+  }
+  for (const row of allDailyViewDates) {
+    if (row.day) monthSet.add(row.day.toISOString().slice(0, 7))
+  }
+  const availableMonths = [...monthSet]
+    .filter(Boolean)
+    .sort((a, b) => b.localeCompare(a))
+    .map((ym) => ({ value: ym, label: formatMonthLabel(ym) }))
+
+  return {
+    month: yearMonth,
+    monthLabel: formatMonthLabel(yearMonth),
+    availableMonths,
+    summary: {
+      publishedInMonthCount,
+      createdInMonthCount: articlesInMonth.length,
+      totalViewsInMonth,
+      activeArticlesViewedCount: dailyViewsInMonth.filter((r) => (r._sum.count || 0) > 0).length,
+      searchesInMonthCount: searchCountInMonth,
+      feedbackTotalInMonth,
+      feedbackHelpfulInMonth,
+      satisfactionPercentInMonth,
+    },
+    articlesInMonth,
+    topViewedInMonth,
+  }
+}
+
+router.get('/reports/monthly', async (req, res, next) => {
+  try {
+    const report = await buildMonthlyReportData(req.query.month)
+    res.json(report)
+  } catch (error) { next(error) }
+})
+
+router.get('/reports/monthly.csv', async (req, res, next) => {
+  try {
+    const report = await buildMonthlyReportData(req.query.month)
+    const fmtDate = (value) => value ? new Intl.DateTimeFormat('th-TH', { timeZone: 'Asia/Bangkok', dateStyle: 'medium' }).format(new Date(value)) : '—'
+    const rows = [
+      ['รายงานสรุปสถิติคลังความรู้ประจำเดือน', report.monthLabel],
+      ['หน่วยงาน', 'ศูนย์พัฒนาทักษะและการเรียนรู้ ICT เทศบาลนครขอนแก่น (KKICT)'],
+      ['บทความที่เผยแพร่ในเดือนนี้ (บทความ)', report.summary.publishedInMonthCount],
+      ['บทความที่สร้าง/อัปเดตในเดือนนี้ทั้งหมด (บทความ)', report.summary.createdInMonthCount],
+      ['ยอดเข้าชมรวมเฉพาะในเดือนนี้ (ครั้ง)', report.summary.totalViewsInMonth],
+      ['จำนวนบทความที่มีผู้เข้าชมในเดือนนี้ (บทความ)', report.summary.activeArticlesViewedCount],
+      ['จำนวนการค้นหาในเดือนนี้ (ครั้ง)', report.summary.searchesInMonthCount],
+      ['ผลประเมินความพึงพอใจในเดือนนี้', `${report.summary.satisfactionPercentInMonth}% (มีประโยชน์ ${report.summary.feedbackHelpfulInMonth} จาก ${report.summary.feedbackTotalInMonth} โหวต)`],
+      [],
+      ['1. รายชื่อบทความที่สร้างหรือเผยแพร่ในเดือนนี้'],
+      ['รหัสบทความ', 'ชื่อบทความ', 'หมวดหมู่', 'สถานะ', 'วันที่เผยแพร่', 'วันที่สร้าง', 'ยอดเข้าชมในเดือนนี้ (ครั้ง)', 'ยอดเข้าชมสะสมทั้งหมด (ครั้ง)', 'จำนวนรูปภาพ', 'มีไฟล์ PDF', 'มีวิดีโอ/ลิงก์'],
+    ]
+    if (report.articlesInMonth.length === 0) {
+      rows.push(['—', 'ไม่มีบทความที่สร้างหรือเผยแพร่ใหม่ในเดือนนี้', '—', '—', '—', '—', 0, 0, 0, 'ไม่มี', 'ไม่มี'])
+    } else {
+      for (const item of report.articlesInMonth) {
+        rows.push([
+          item.articleId,
+          item.title,
+          item.categoryName,
+          STATUS_THAI[item.status] || item.status,
+          fmtDate(item.publishedAt),
+          fmtDate(item.createdAt),
+          item.monthViews,
+          item.totalViews,
+          item.imageCount,
+          item.hasPdf ? 'มี' : 'ไม่มี',
+          item.hasVideo ? 'มี' : 'ไม่มี',
+        ])
+      }
+    }
+    rows.push(
+      [],
+      ['2. อันดับบทความที่มียอดเข้าชมสูงสุดในเดือนนี้'],
+      ['อันดับ', 'รหัสบทความ', 'ชื่อบทความ', 'หมวดหมู่', 'สถานะ', 'ยอดเข้าชมในเดือนนี้ (ครั้ง)', 'ยอดเข้าชมสะสมทั้งหมด (ครั้ง)'],
+    )
+    if (report.topViewedInMonth.length === 0) {
+      rows.push(['—', '—', 'ไม่มีสถิติการเข้าชมในเดือนนี้', '—', '—', 0, 0])
+    } else {
+      report.topViewedInMonth.forEach((item, index) => {
+        rows.push([
+          index + 1,
+          item.articleId,
+          item.title,
+          item.categoryName,
+          STATUS_THAI[item.status] || item.status,
+          item.monthViews,
+          item.totalViews,
+        ])
+      })
+    }
+    res.set({
+      'Content-Type': 'text/csv; charset=utf-8',
+      'Content-Disposition': `attachment; filename="ict-monthly-report-${report.month}.csv"`,
+    })
+    res.send(`\uFEFF${rows.map((row) => row.map(quoteCsv).join(',')).join('\r\n')}`)
+  } catch (error) { next(error) }
+})
+
 router.get('/reports/articles.csv', async (_req, res, next) => {
   try {
     const [articles, feedbackRows] = await Promise.all([
@@ -372,7 +580,8 @@ router.get('/articles', async (req, res, next) => {
       if (row.helpful) item.helpfulCount += row._count._all
       stats.set(row.articleId, item)
     }
-    res.json(articles.map((article) => {
+    res.json(articles.map((raw) => {
+      const article = normalizeAdminArticle(raw)
       const item = stats.get(article.articleId) || { feedbackCount: 0, helpfulCount: 0 }
       return { ...article, ...item, helpfulPercent: item.feedbackCount ? Math.round(item.helpfulCount * 100 / item.feedbackCount) : 0 }
     }))
@@ -385,7 +594,7 @@ router.get('/articles/:id', async (req, res, next) => {
   try {
     const article = await prisma.article.findUnique({ where: { articleId }, include: { category: { select: { categoryId: true, categoryName: true } } } })
     if (!article) return res.status(404).json({ message: 'ไม่พบบทความนี้' })
-    res.json(article)
+    res.json(normalizeAdminArticle(article))
   } catch (error) { next(error) }
 })
 
@@ -414,17 +623,43 @@ function parseArticleInput(body) {
   return { data: { title, content, categoryId, status, keywords, steps, videoUrl, featured: body.featured === 'true' || body.featured === true } }
 }
 
+function uploadedImagePaths(req) {
+  const files = [...(req.files?.images || []), ...(req.files?.image || [])]
+  return files.map((file) => storedUpload(file.filename)).filter(Boolean)
+}
+
+function parseKeptImages(rawKept, existingList) {
+  if (rawKept === undefined) return null
+  const existingSet = new Set(existingList)
+  let candidates = []
+  if (Array.isArray(rawKept)) {
+    candidates = rawKept
+  } else if (typeof rawKept === 'string') {
+    const trimmed = rawKept.trim()
+    if (!trimmed) return []
+    try {
+      const parsed = JSON.parse(trimmed)
+      candidates = Array.isArray(parsed) ? parsed : [trimmed]
+    } catch {
+      candidates = trimmed.split(',').map((s) => s.trim()).filter(Boolean)
+    }
+  }
+  return [...new Set(candidates.filter((item) => typeof item === 'string' && existingSet.has(item)))]
+}
+
 router.post('/articles', uploadFiles, async (req, res, next) => {
   const parsed = parseArticleInput(req.body || {})
   if (parsed.error) { await removeNewFiles(req.files); return res.status(400).json({ message: parsed.error }) }
   try {
     const category = await prisma.category.findUnique({ where: { categoryId: parsed.data.categoryId }, select: { categoryId: true } })
     if (!category) { await removeNewFiles(req.files); return res.status(400).json({ message: 'ไม่พบหมวดหมู่ที่เลือก' }) }
+    const images = uploadedImagePaths(req).slice(0, 5)
+    const image = images[0] || null
     const article = await prisma.article.create({ data: {
-      ...parsed.data, image: optionalUpload(req, 'image'), pdfFile: optionalUpload(req, 'pdfFile'),
+      ...parsed.data, image, images, pdfFile: optionalUpload(req, 'pdfFile'),
       publishedAt: parsed.data.status === 'PUBLISHED' ? new Date() : null,
     }, include: { category: { select: { categoryId: true, categoryName: true } } } })
-    res.status(201).json(article)
+    res.status(201).json(normalizeAdminArticle(article))
   } catch (error) { await removeNewFiles(req.files); next(error) }
 })
 
@@ -434,11 +669,31 @@ router.patch('/articles/:id', uploadFiles, async (req, res, next) => {
   if (!Number.isInteger(articleId) || articleId < 1) { await removeNewFiles(req.files); return res.status(400).json({ message: 'รหัสบทความไม่ถูกต้อง' }) }
   if (parsed.error) { await removeNewFiles(req.files); return res.status(400).json({ message: parsed.error }) }
   try {
-    const existing = await prisma.article.findUnique({ where: { articleId }, select: { image: true, pdfFile: true, videoUrl: true, publishedAt: true } })
+    const existing = await prisma.article.findUnique({ where: { articleId }, select: { image: true, images: true, pdfFile: true, videoUrl: true, publishedAt: true } })
     if (!existing) { await removeNewFiles(req.files); return res.status(404).json({ message: 'ไม่พบบทความนี้' }) }
     const category = await prisma.category.findUnique({ where: { categoryId: parsed.data.categoryId }, select: { categoryId: true } })
     if (!category) { await removeNewFiles(req.files); return res.status(400).json({ message: 'ไม่พบหมวดหมู่ที่เลือก' }) }
-    const image = optionalUpload(req, 'image') || (req.body.removeImage === 'true' ? null : existing.image)
+    const existingImages = Array.isArray(existing.images) && existing.images.length
+      ? existing.images.filter(Boolean)
+      : (existing.image ? [existing.image] : [])
+    const newUploads = uploadedImagePaths(req)
+    const explicitKept = parseKeptImages(req.body.keptImages, existingImages)
+    let keptImages
+    if (req.body.removeImage === 'true') {
+      keptImages = []
+    } else if (explicitKept !== null) {
+      keptImages = explicitKept
+    } else if (req.files?.image?.length && !req.files?.images?.length) {
+      keptImages = []
+    } else {
+      keptImages = existingImages
+    }
+    const finalImages = [...keptImages, ...newUploads]
+    if (finalImages.length > 5) {
+      await removeNewFiles(req.files)
+      return res.status(400).json({ message: 'สามารถแนบรูปภาพประกอบได้สูงสุด 5 รูปต่อบทความ' })
+    }
+    const image = finalImages[0] || null
     const pdfFile = optionalUpload(req, 'pdfFile') || (req.body.removePdf === 'true' ? null : existing.pdfFile)
     const videoUrl = req.body.removeVideo === 'true'
       ? null
@@ -446,12 +701,15 @@ router.patch('/articles/:id', uploadFiles, async (req, res, next) => {
         ? parsed.data.videoUrl
         : existing.videoUrl
     const article = await prisma.article.update({ where: { articleId }, data: {
-      ...parsed.data, image, pdfFile, videoUrl,
+      ...parsed.data, image, images: finalImages, pdfFile, videoUrl,
       publishedAt: parsed.data.status === 'PUBLISHED' ? existing.publishedAt || new Date() : existing.publishedAt,
     }, include: { category: { select: { categoryId: true, categoryName: true } } } })
-    if (image !== existing.image) await removeStoredUpload(existing.image)
+    const finalSet = new Set(finalImages)
+    for (const oldImg of new Set([...existingImages, existing.image].filter(Boolean))) {
+      if (!finalSet.has(oldImg)) await removeStoredUpload(oldImg)
+    }
     if (pdfFile !== existing.pdfFile) await removeStoredUpload(existing.pdfFile)
-    res.json(article)
+    res.json(normalizeAdminArticle(article))
   } catch (error) { await removeNewFiles(req.files); next(error) }
 })
 
@@ -463,7 +721,7 @@ router.patch('/articles/:id/status', async (req, res, next) => {
     const current = await prisma.article.findUnique({ where: { articleId }, select: { publishedAt: true } })
     if (!current) return res.status(404).json({ message: 'ไม่พบบทความนี้' })
     const article = await prisma.article.update({ where: { articleId }, data: { status, publishedAt: status === 'PUBLISHED' ? current.publishedAt || new Date() : current.publishedAt } })
-    res.json(article)
+    res.json(normalizeAdminArticle(article))
   } catch (error) { next(error) }
 })
 
@@ -471,8 +729,9 @@ router.delete('/articles/:id', async (req, res, next) => {
   const articleId = Number.parseInt(req.params.id, 10)
   if (!Number.isInteger(articleId) || articleId < 1) return res.status(400).json({ message: 'รหัสบทความไม่ถูกต้อง' })
   try {
-    const article = await prisma.article.delete({ where: { articleId }, select: { image: true, pdfFile: true } })
-    await Promise.all([removeStoredUpload(article.image), removeStoredUpload(article.pdfFile)])
+    const article = await prisma.article.delete({ where: { articleId }, select: { image: true, images: true, pdfFile: true } })
+    const allImages = [...new Set([...(article.images || []), article.image].filter(Boolean))]
+    await Promise.all([...allImages.map((img) => removeStoredUpload(img)), removeStoredUpload(article.pdfFile)])
     res.json({ message: 'ลบบทความแล้ว' })
   } catch (error) {
     if (error.code === 'P2025') return res.status(404).json({ message: 'ไม่พบบทความนี้' })
