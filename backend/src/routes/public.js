@@ -67,6 +67,186 @@ function normalizeArticleImages(article) {
   return { ...article, image, images }
 }
 
+const EN_LAYOUT = "1234567890-=qwertyuiop[]\\asdfghjkl;'zxcvbnm,./!@#$%^&*()_+QWERTYUIOP{}|ASDFGHJKL:\"ZXCVBNM<>?"
+const TH_LAYOUT = "ๅ/-ภถุึคตจขชๆไำพะัีรนยบลฃฟหกดเ้่าสวงผปแอิืทมใฝ+๑๒๓๔ู฿๕๖๗๘๙๐\"ฎฑธํ๊ณฯญฐ,ฅฤฆฏโฌ็๋ษศซ.()ฉฮฺ์?ฒฬฦ"
+const EN_TO_TH = new Map([...EN_LAYOUT].map((ch, i) => [ch, TH_LAYOUT[i]]))
+const TH_TO_EN = new Map([...TH_LAYOUT].map((ch, i) => [ch, EN_LAYOUT[i]]))
+
+function swapKeyboardLayout(input) {
+  if (typeof input !== 'string' || !input) return ''
+  let thCount = 0
+  let enCount = 0
+  for (const ch of input) {
+    if (TH_TO_EN.has(ch)) thCount += 1
+    else if (EN_TO_TH.has(ch)) enCount += 1
+  }
+  const map = thCount >= enCount ? TH_TO_EN : EN_TO_TH
+  return [...input].map((ch) => map.get(ch) ?? ch).join('')
+}
+
+function stripThaiTones(text) {
+  return String(text || '').toLowerCase().replace(/[\u0E47-\u0E4E\-\s_.,/\\()'"]/g, '')
+}
+
+function levenshtein(a, b) {
+  if (a === b) return 0
+  if (!a.length) return b.length
+  if (!b.length) return a.length
+  const prev = Array.from({ length: b.length + 1 }, (_, i) => i)
+  const curr = new Array(b.length + 1)
+  for (let i = 1; i <= a.length; i += 1) {
+    curr[0] = i
+    for (let j = 1; j <= b.length; j += 1) {
+      const cost = a[i - 1] === b[j - 1] ? 0 : 1
+      curr[j] = Math.min(prev[j] + 1, curr[j - 1] + 1, prev[j - 1] + cost)
+    }
+    for (let j = 0; j <= b.length; j += 1) prev[j] = curr[j]
+  }
+  return prev[b.length]
+}
+
+function bigramSimilarity(a, b) {
+  if (a.length < 2 || b.length < 2) return a === b ? 1 : 0
+  const getBigrams = (s) => {
+    const map = new Map()
+    for (let i = 0; i < s.length - 1; i += 1) {
+      const bg = s.slice(i, i + 2)
+      map.set(bg, (map.get(bg) || 0) + 1)
+    }
+    return map
+  }
+  const mapA = getBigrams(a)
+  const mapB = getBigrams(b)
+  let overlap = 0
+  for (const [bg, countA] of mapA) {
+    if (mapB.has(bg)) overlap += Math.min(countA, mapB.get(bg))
+  }
+  return (2 * overlap) / (a.length - 1 + (b.length - 1))
+}
+
+function similarityScore(queryRaw, candidateRaw) {
+  const q = stripThaiTones(queryRaw)
+  const c = stripThaiTones(candidateRaw)
+  if (!q || !c) return 0
+  if (q === c) return 0.98
+  if (c.startsWith(q) || q.startsWith(c)) {
+    const ratio = Math.min(q.length, c.length) / Math.max(q.length, c.length)
+    return 0.78 + ratio * 0.16
+  }
+  if (c.includes(q) || q.includes(c)) {
+    const ratio = Math.min(q.length, c.length) / Math.max(q.length, c.length)
+    return 0.68 + ratio * 0.18
+  }
+  const maxLen = Math.max(q.length, c.length)
+  const editSim = 1 - levenshtein(q, c) / maxLen
+  const diceSim = bigramSimilarity(q, c)
+  return Math.max(editSim * 0.85 + diceSim * 0.15, diceSim * 0.85 + editSim * 0.15)
+}
+
+const SYNONYM_RULES = [
+  { patterns: [/ไวไฟ/i, /วายฟาย/i, /wify/i, /wifii/i, /wi\s*fi/i, /wlan/i, /ไร้สาย/i], targets: ['Wi-Fi', 'เครือข่าย'] },
+  { patterns: [/ปริ้น/i, /ปริน/i, /ปริ๊น/i, /พริ้น/i, /priter/i, /prinnter/i, /print/i, /หมึก/i, /กระดาษติด/i], targets: ['Printer', 'เครื่องพิมพ์'] },
+  { patterns: [/พาสเวิร์ด/i, /พาสเวิด/i, /รหัด/i, /รหัสผาน/i, /ลืมรหัส/i, /pasword/i, /passward/i, /passwd/i, /login/i, /ล็อกอิน/i], targets: ['รหัสผ่าน', 'บัญชีผู้ใช้'] },
+  { patterns: [/วินโดว์/i, /วินโดว/i, /วินโด/i, /windown/i, /window\b/i, /win11/i, /win10/i], targets: ['Windows 11', 'Windows'] },
+  { patterns: [/เนต/i, /เน็ต/i, /เน็ท/i, /อินเตอร์เน็ต/i, /อินเตอ/i, /อินเทอ/i, /intenet/i, /internat/i, /สายแลน/i, /แลน/i, /\blan\b/i], targets: ['อินเทอร์เน็ต', 'เครือข่าย', 'IP'] },
+  { patterns: [/คอมค้าง/i, /คอมช้า/i, /เครื่องอืด/i, /เปิดไม่ติด/i, /จอดำ/i, /จอมืด/i, /โน๊ตบุ๊ค/i, /โน้ตบุ๊ก/i, /คีย์บอด/i, /เม้าส์/i], targets: ['คอมพิวเตอร์', 'เครื่องช้า', 'จอภาพ'] },
+  { patterns: [/แสกน/i, /สแกน/i, /scaner/i, /scann/i], targets: ['สแกนเนอร์', 'เครื่องพิมพ์'] },
+  { patterns: [/ไวรัด/i, /ไวรัส/i, /มัลแว/i, /แฮก/i, /สแปม/i, /ฟิชชิ่ง/i, /virus/i, /malware/i], targets: ['ความปลอดภัย', 'ไวรัส'] },
+  { patterns: [/พีดีเอฟ/i, /แปลงไฟล/i, /ไฟลหาย/i, /กู้ไฟล/i, /สำรอง/i, /backup/i], targets: ['PDF', 'สำรองข้อมูล'] },
+  { patterns: [/ซูม/i, /มีท/i, /ประชุม/i, /ไมค์/i, /กล้อง/i, /ลำโพง/i, /zoom/i, /meet/i], targets: ['ประชุมออนไลน์', 'ไมโครโฟน'] },
+]
+
+async function buildSearchSuggestions(query) {
+  if (!query || isProfaneSearchTerm(query)) return { didYouMean: null, suggestions: [], suggestedArticles: [] }
+  const published = await prisma.article.findMany({
+    where: publicArticle,
+    orderBy: [{ viewCount: 'desc' }, { publishedAt: 'desc' }],
+    select: articleSelect,
+  })
+  if (!published.length) return { didYouMean: null, suggestions: [], suggestedArticles: [] }
+
+  const candidatePool = new Map()
+  const addCandidate = (term, weight = 1) => {
+    const clean = typeof term === 'string' ? term.trim() : ''
+    if (!clean || clean.length < 2 || clean.length > 60) return
+    const key = clean.toLowerCase()
+    const prev = candidatePool.get(key)
+    if (!prev || weight > prev.weight) candidatePool.set(key, { term: clean, weight })
+  }
+
+  for (const article of published) {
+    for (const kw of article.keywords || []) addCandidate(kw, 1.15)
+    if (article.category?.categoryName) addCandidate(article.category.categoryName, 1.0)
+    const titleTokens = article.title.split(/[\s()/·,]+/).filter((t) => t.length >= 3 && t.length <= 40)
+    for (const token of titleTokens) addCandidate(token, 0.92)
+  }
+
+  const swapped = swapKeyboardLayout(query)
+  const queriesToTest = [query, swapped].filter(Boolean)
+  const normQuery = query.trim().toLowerCase()
+
+  const synonymBoosts = new Set()
+  for (const qVariant of queriesToTest) {
+    for (const rule of SYNONYM_RULES) {
+      if (rule.patterns.some((p) => p.test(qVariant))) {
+        for (const t of rule.targets) synonymBoosts.add(t.toLowerCase())
+      }
+    }
+  }
+
+  const scored = []
+  for (const [key, { term, weight }] of candidatePool) {
+    if (key === normQuery) continue
+    let bestSim = 0
+    for (const qVariant of queriesToTest) {
+      const sim = similarityScore(qVariant, term)
+      if (sim > bestSim) bestSim = sim
+      for (const word of qVariant.split(/\s+/).filter((w) => w.length >= 2)) {
+        const wSim = similarityScore(word, term) * 0.94
+        if (wSim > bestSim) bestSim = wSim
+      }
+    }
+    if (synonymBoosts.has(key)) {
+      bestSim = Math.max(bestSim, 0.92)
+    }
+    const finalScore = bestSim * weight
+    if (bestSim >= 0.36) {
+      scored.push({ term, score: finalScore, rawSim: bestSim })
+    }
+  }
+
+  scored.sort((a, b) => b.score - a.score)
+  const topMatched = scored.slice(0, 5).map((item) => item.term)
+  const didYouMean = scored[0] && scored[0].rawSim >= 0.46 ? scored[0].term : (topMatched[0] || null)
+
+  let suggestions = [...topMatched]
+  if (suggestions.length < 5) {
+    for (const article of published) {
+      for (const kw of article.keywords || []) {
+        if (kw.toLowerCase() !== normQuery && !suggestions.some((s) => s.toLowerCase() === kw.toLowerCase())) {
+          suggestions.push(kw)
+          if (suggestions.length >= 5) break
+        }
+      }
+      if (suggestions.length >= 5) break
+    }
+  }
+
+  const matchTerms = topMatched.slice(0, 3).map((t) => t.toLowerCase())
+  let suggestedArticles = []
+  if (matchTerms.length) {
+    suggestedArticles = published
+      .filter((article) => {
+        const hay = `${article.title} ${(article.keywords || []).join(' ')} ${article.category?.categoryName || ''}`.toLowerCase()
+        return matchTerms.some((mt) => hay.includes(mt) || hay.replace(/-/g, '').includes(mt.replace(/-/g, '')))
+      })
+      .slice(0, 3)
+      .map(normalizeArticleImages)
+  }
+
+  return { didYouMean, suggestions, suggestedArticles }
+}
+
 router.get('/settings/contact', async (_req, res, next) => {
   try {
     const setting = await prisma.siteSetting.findUnique({ where: { key: CONTACT_SETTING_KEY }, select: { value: true } })
@@ -178,7 +358,18 @@ router.get('/articles/search', async (req, res, next) => {
       const rawItems = await prisma.article.findMany({ where, orderBy, skip, take: pageSize, select: articleSelect })
       items = rawItems.map(normalizeArticleImages)
     }
-    res.json({ items, total, page, pageSize, pageCount: Math.ceil(total / pageSize) })
+    let suggestionPayload = { didYouMean: null, suggestions: [], suggestedArticles: [] }
+    if (query && total <= 2) {
+      suggestionPayload = await buildSearchSuggestions(query)
+    }
+    res.json({
+      items,
+      total,
+      page,
+      pageSize,
+      pageCount: Math.ceil(total / pageSize),
+      ...suggestionPayload,
+    })
   } catch (error) { next(error) }
 })
 
