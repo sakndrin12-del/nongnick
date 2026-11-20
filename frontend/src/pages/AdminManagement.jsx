@@ -174,11 +174,36 @@ function PasswordSettings() {
   </form>
 }
 
+const MONTHLY_PREVIEW_COUNT = 5
+const TERM_PREVIEW_COUNT = 5
+
+function ShowMoreButton({ expanded, hiddenCount, onToggle, unit = 'รายการ' }) {
+  if (!expanded && hiddenCount <= 0) return null
+  return <button type="button" className="show-more-btn" aria-expanded={expanded} onClick={onToggle}>
+    {expanded ? <>ย่อรายการ <span aria-hidden="true">▴</span></> : <>ดูเพิ่มเติมอีก {hiddenCount.toLocaleString('th-TH')} {unit} <span aria-hidden="true">▾</span></>}
+  </button>
+}
+
+function DashSectionTitle({ icon, title, hint, children }) {
+  return <div className="dash-section-head">
+    <div className="dash-section-title">
+      <span className="dash-section-icon" aria-hidden="true">{icon}</span>
+      <div>
+        <h2>{title}</h2>
+        {hint && <p>{hint}</p>}
+      </div>
+    </div>
+    {children && <div className="dash-section-actions">{children}</div>}
+  </div>
+}
+
 export function AdminHome() {
   const [refresh, setRefresh] = useState(0)
   const { data, loading, error } = useAdminData('/admin/dashboard', refresh)
   const [insightDays, setInsightDays] = useState(30)
   const [selectedMonth, setSelectedMonth] = useState('')
+  const [expandedMonth, setExpandedMonth] = useState('')
+  const [expandedTerms, setExpandedTerms] = useState({ zero: false, top: false })
   const [overviewTab, setOverviewTab] = useState('popular')
   const insights = useAdminData(`/admin/insights?days=${insightDays}`, refresh)
   const monthly = useAdminData(`/admin/reports/monthly${selectedMonth ? `?month=${encodeURIComponent(selectedMonth)}` : ''}`, refresh)
@@ -188,11 +213,15 @@ export function AdminHome() {
   const monthlyData = monthly.data || null
   const activeMonth = selectedMonth || monthlyData?.month || ''
   useDocumentTitle('ภาพรวม · ระบบเจ้าหน้าที่')
+
   async function publishNow(article) {
     setActionError('')
     setActionNotice('')
-    try { await api.patch(`/admin/articles/${article.articleId}/status`, { status: 'PUBLISHED' }); setRefresh((value) => value + 1) }
-    catch (err) { setActionError(err.message) }
+    try {
+      await api.patch(`/admin/articles/${article.articleId}/status`, { status: 'PUBLISHED' })
+      setActionNotice(`เผยแพร่ “${article.title}” แล้ว`)
+      setRefresh((value) => value + 1)
+    } catch (err) { setActionError(err.message) }
   }
   async function exportCsv() {
     setActionError('')
@@ -216,155 +245,277 @@ export function AdminHome() {
       setRefresh((value) => value + 1)
     } catch (err) { setActionError(err.message) }
   }
+
   const categoryRows = dashboard.categories || []
   const maxCategoryCount = Math.max(1, ...categoryRows.map((category) => category._count?.articles || 0))
   const totalCategoryArticles = Math.max(1, categoryRows.reduce((sum, category) => sum + (category._count?.articles || 0), 0))
-  const maxTopTermCount = Math.max(1, ...(insights.data?.topTerms || []).map((item) => item.count || 0))
-  const pendingCount = (dashboard.pendingDrafts?.length || 0) + (dashboard.negativeFeedback?.length || 0)
-  return <section className="admin-content admin-dashboard">
-    <div className="admin-title-row dashboard-header-row">
+  const topTerms = insights.data?.topTerms || []
+  const zeroTerms = insights.data?.zeroResultTerms || []
+  const maxTopTermCount = Math.max(1, ...topTerms.map((item) => item.count || 0))
+  const draftCount = dashboard.pendingDrafts?.length || 0
+  const negativeCount = dashboard.negativeFeedback?.length || 0
+  const pendingCount = draftCount + negativeCount
+
+  const monthArticles = monthlyData?.articlesInMonth || []
+  const monthExpanded = expandedMonth === activeMonth && activeMonth !== ''
+  const visibleMonthArticles = monthExpanded ? monthArticles : monthArticles.slice(0, MONTHLY_PREVIEW_COUNT)
+  const visibleZeroTerms = expandedTerms.zero ? zeroTerms : zeroTerms.slice(0, TERM_PREVIEW_COUNT)
+  const visibleTopTerms = expandedTerms.top ? topTerms : topTerms.slice(0, TERM_PREVIEW_COUNT)
+
+  function toggleMonthList() {
+    if (monthExpanded) {
+      setExpandedMonth('')
+      document.getElementById('monthly-article-list')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
+    } else {
+      setExpandedMonth(activeMonth)
+    }
+  }
+
+  return <section className="admin-content admin-dashboard dash-simple">
+    <div className="dash-hero">
       <div>
-        <span className="eyebrow">OVERVIEW • ศูนย์พัฒนาทักษะและการเรียนรู้ ICT ขอนแก่น</span>
+        <span className="dash-hero-kicker">ศูนย์พัฒนาทักษะและการเรียนรู้ ICT เทศบาลนครขอนแก่น</span>
         <h1>ภาพรวมคลังความรู้</h1>
-        <p className="admin-muted">สรุปสถิติการเข้าชม รายงานประจำเดือน คำค้นหาของผู้ใช้งาน และสถานะบทความในระบบ</p>
+        <p>ดูตัวเลขสำคัญ รายงานประจำเดือน และสิ่งที่ควรทำต่อ ได้ในหน้าเดียว</p>
       </div>
-      <div className="dashboard-quick-actions">
-        <button type="button" className="admin-secondary-link" onClick={exportCsv}>⇣ ส่งออก CSV ทั้งหมด</button>
+      <div className="dash-hero-actions">
         <Link className="admin-primary-link" to="/admin/articles/new">＋ เขียนบทความใหม่</Link>
+        <button type="button" className="admin-secondary-link" onClick={exportCsv}>⇣ ส่งออกบทความทั้งหมด (CSV)</button>
       </div>
     </div>
+
     <Alert type="success">{actionNotice}</Alert>
     <Alert>{error || actionError}</Alert>
-    {loading ? <p className="admin-loading">กำลังโหลดข้อมูล...</p> : <>
-      <div className="dashboard-cards">
-        <div><div className="kpi-head"><span>บทความที่เผยแพร่</span><i className="kpi-icon" aria-hidden="true">✓</i></div><b>{Number(dashboard.publishedCount || 0).toLocaleString('th-TH')}</b><small>จากทั้งหมด {Number(dashboard.articleCount || 0).toLocaleString('th-TH')} บทความ (ร่าง/ซ่อน {Number(dashboard.draftCount || 0) + Number(dashboard.hiddenCount || 0)})</small></div>
-        <div><div className="kpi-head"><span>หมวดหมู่ความรู้</span><i className="kpi-icon" aria-hidden="true">▣</i></div><b>{Number(dashboard.categoryCount || 0).toLocaleString('th-TH')}</b><small>กลุ่มหัวข้อบริการและคู่มือไอที</small></div>
-        <div><div className="kpi-head"><span>ยอดเข้าชมสะสม</span><i className="kpi-icon" aria-hidden="true">◉</i></div><b>{Number(dashboard.totalViews || 0).toLocaleString('th-TH')}</b><small>จำนวนครั้งที่เปิดอ่านคู่มือทั้งหมด</small></div>
-        <div className="satisfaction-card"><div className="kpi-head"><span>อัตราความพึงพอใจ</span><i className="kpi-icon" aria-hidden="true">★</i></div><b>{Number(dashboard.helpfulPercent || 0)}%</b><div className="satisfaction-meter" aria-hidden="true"><span style={{ width: `${Math.min(100, Number(dashboard.helpfulPercent || 0))}%` }}/></div><small>มีประโยชน์ {dashboard.helpfulCount || 0} จาก {dashboard.feedbackCount || 0} โหวต</small></div>
-      </div>
 
-      <div className="dashboard-panel monthly-report-panel">
-        <div className="dashboard-panel-heading monthly-panel-head">
+    {loading ? <p className="admin-loading">กำลังโหลดข้อมูล...</p> : <>
+      <div className="dash-kpi-grid">
+        <div className="dash-kpi is-green">
+          <span className="dash-kpi-icon" aria-hidden="true">✓</span>
           <div>
-            <span className="eyebrow">MONTHLY PERFORMANCE REPORT</span>
-            <h2>รายงานสรุปสถิติประจำเดือน {monthlyData?.monthLabel ? `· ${monthlyData.monthLabel}` : ''}</h2>
-          </div>
-          <div className="monthly-controls">
-            <label className="insights-range-picker">
-              เลือกเดือน/ปี
-              <select
-                aria-label="เลือกเดือนและปีของรายงานประจำเดือน"
-                value={activeMonth}
-                onChange={(event) => setSelectedMonth(event.target.value)}
-              >
-                {(monthlyData?.availableMonths || []).map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
-              </select>
-            </label>
-            <button type="button" className="admin-primary-link monthly-export-btn" onClick={exportMonthlyCsv}>
-              ⇣ ดาวน์โหลดรายงานประจำเดือน (Export Monthly CSV)
-            </button>
+            <small>บทความที่เผยแพร่</small>
+            <b>{Number(dashboard.publishedCount || 0).toLocaleString('th-TH')}</b>
+            <p>จากทั้งหมด {Number(dashboard.articleCount || 0).toLocaleString('th-TH')} บทความ</p>
           </div>
         </div>
+        <div className="dash-kpi is-blue">
+          <span className="dash-kpi-icon" aria-hidden="true">◉</span>
+          <div>
+            <small>ยอดเข้าชมสะสม</small>
+            <b>{Number(dashboard.totalViews || 0).toLocaleString('th-TH')}</b>
+            <p>ครั้งที่มีผู้เปิดอ่านคู่มือ</p>
+          </div>
+        </div>
+        <div className="dash-kpi is-gold">
+          <span className="dash-kpi-icon" aria-hidden="true">★</span>
+          <div>
+            <small>ความพึงพอใจ</small>
+            <b>{Number(dashboard.helpfulPercent || 0)}%</b>
+            <p>มีประโยชน์ {dashboard.helpfulCount || 0} จาก {dashboard.feedbackCount || 0} โหวต</p>
+          </div>
+        </div>
+        <div className="dash-kpi is-purple">
+          <span className="dash-kpi-icon" aria-hidden="true">▣</span>
+          <div>
+            <small>หมวดหมู่ความรู้</small>
+            <b>{Number(dashboard.categoryCount || 0).toLocaleString('th-TH')}</b>
+            <p>ฉบับร่าง/ซ่อน {Number(dashboard.draftCount || 0) + Number(dashboard.hiddenCount || 0)} บทความ</p>
+          </div>
+        </div>
+      </div>
+
+      {pendingCount > 0 && <div className="dash-todo-banner" role="status">
+        <span className="dash-todo-icon" aria-hidden="true">!</span>
+        <div>
+          <b>สิ่งที่ควรทำต่อ</b>
+          <p>
+            {draftCount > 0 && <>มีฉบับร่างรอเผยแพร่ <strong>{draftCount}</strong> บทความ</>}
+            {draftCount > 0 && negativeCount > 0 && ' · '}
+            {negativeCount > 0 && <>มีบทความที่ผู้อ่านแจ้งว่ายังไม่ช่วยแก้ปัญหา <strong>{negativeCount}</strong> บทความ</>}
+          </p>
+        </div>
+        <button type="button" className="admin-secondary-link" onClick={() => { setOverviewTab('activity'); document.getElementById('dash-overview-tabs')?.scrollIntoView({ behavior: 'smooth', block: 'start' }) }}>ดูรายการ →</button>
+      </div>}
+
+      <div className="dashboard-panel dash-card monthly-report-panel">
+        <DashSectionTitle icon="📅" title="รายงานประจำเดือน" hint="เลือกเดือนเพื่อดูผลงาน และดาวน์โหลดไฟล์ไปทำรายงานส่งหัวหน้าได้ทันที">
+          <label className="dash-select">
+            <span>เดือน</span>
+            <select aria-label="เลือกเดือนและปีของรายงานประจำเดือน" value={activeMonth} onChange={(event) => setSelectedMonth(event.target.value)}>
+              {(monthlyData?.availableMonths || []).map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
+            </select>
+          </label>
+          <button type="button" className="admin-primary-link" onClick={exportMonthlyCsv}>⇣ ดาวน์โหลดรายงาน (CSV)</button>
+        </DashSectionTitle>
+
         {monthly.loading ? <p className="dashboard-empty">กำลังโหลดรายงานประจำเดือน...</p> : monthly.error ? <p className="dashboard-empty" role="alert">{monthly.error}</p> : monthlyData && <>
-          <div className="monthly-kpi-grid">
-            <div className="monthly-kpi-card">
-              <span>บทความที่เผยแพร่ในเดือนนี้</span>
-              <b>{Number(monthlyData.summary.publishedInMonthCount || 0).toLocaleString('th-TH')} <small>บทความ</small></b>
-              <p>สร้างหรืออัปเดตในเดือนนี้ทั้งหมด {Number(monthlyData.summary.createdInMonthCount || 0).toLocaleString('th-TH')} บทความ</p>
+          <div className="dash-month-stats">
+            <div>
+              <small>เผยแพร่ในเดือนนี้</small>
+              <b>{Number(monthlyData.summary.publishedInMonthCount || 0).toLocaleString('th-TH')} <span>บทความ</span></b>
             </div>
-            <div className="monthly-kpi-card is-accent">
-              <span>ยอดเข้าชมรวมเฉพาะในเดือนนี้</span>
-              <b>{Number(monthlyData.summary.totalViewsInMonth || 0).toLocaleString('th-TH')} <small>ครั้ง</small></b>
-              <p>จากบทความที่มีผู้เปิดอ่านในเดือนนี้ {Number(monthlyData.summary.activeArticlesViewedCount || 0).toLocaleString('th-TH')} บทความ</p>
+            <div className="is-accent">
+              <small>ยอดเข้าชมในเดือนนี้</small>
+              <b>{Number(monthlyData.summary.totalViewsInMonth || 0).toLocaleString('th-TH')} <span>ครั้ง</span></b>
             </div>
-            <div className="monthly-kpi-card">
-              <span>การค้นหา & ความพึงพอใจในเดือนนี้</span>
-              <b>{Number(monthlyData.summary.searchesInMonthCount || 0).toLocaleString('th-TH')} <small>ครั้งที่ค้นหา</small></b>
-              <p>ความพึงพอใจ {monthlyData.summary.satisfactionPercentInMonth}% (มีประโยชน์ {monthlyData.summary.feedbackHelpfulInMonth}/{monthlyData.summary.feedbackTotalInMonth} โหวต)</p>
+            <div>
+              <small>การค้นหาในเดือนนี้</small>
+              <b>{Number(monthlyData.summary.searchesInMonthCount || 0).toLocaleString('th-TH')} <span>ครั้ง</span></b>
+            </div>
+            <div>
+              <small>ความพึงพอใจในเดือนนี้</small>
+              <b>{monthlyData.summary.satisfactionPercentInMonth}% <span>({monthlyData.summary.feedbackHelpfulInMonth}/{monthlyData.summary.feedbackTotalInMonth} โหวต)</span></b>
             </div>
           </div>
 
-          <div className="monthly-articles-block">
-            <div className="monthly-subhead">
-              <h3>รายชื่อบทความที่สร้าง/เผยแพร่ในเดือน {monthlyData.monthLabel} ({monthlyData.articlesInMonth.length} บทความ)</h3>
+          <div id="monthly-article-list" className="dash-list-block">
+            <div className="dash-list-head">
+              <h3>บทความที่สร้าง/เผยแพร่ในเดือน {monthlyData.monthLabel}</h3>
+              <span className="panel-pill">{monthArticles.length.toLocaleString('th-TH')} บทความ</span>
             </div>
-            {monthlyData.articlesInMonth.length ? <div className="admin-table-wrap">
-              <table className="admin-table dashboard-table">
-                <thead>
-                  <tr>
-                    <th>ชื่อบทความ</th>
-                    <th>หมวดหมู่</th>
-                    <th>สถานะ</th>
-                    <th>วันที่เผยแพร่/สร้าง</th>
-                    <th>ยอดวิวในเดือนนี้</th>
-                    <th>ยอดวิวสะสม</th>
-                    <th>สื่อประกอบ</th>
-                    <th>จัดการ</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {monthlyData.articlesInMonth.map((item) => <tr key={item.articleId}>
-                    <td><b>{item.title}</b></td>
-                    <td><span className="category-chip">{item.categoryName}</span></td>
-                    <td><StatusBadge status={item.status}/></td>
-                    <td>{dateLabel(item.publishedAt || item.createdAt)}</td>
-                    <td><b className="metric-num">{Number(item.monthViews || 0).toLocaleString('th-TH')}</b> <small>ครั้ง</small></td>
-                    <td>{Number(item.totalViews || 0).toLocaleString('th-TH')} <small>ครั้ง</small></td>
-                    <td><small>{item.imageCount ? `🖼 ${item.imageCount} รูป` : '—'} · {item.hasPdf ? 'PDF' : '—'} · {item.hasVideo ? '🎬 วิดีโอ' : '—'}</small></td>
-                    <td><div className="admin-row-actions"><Link to={`/articles/${item.articleId}?preview=1`} target="_blank" rel="opener">ดูหน้าเว็บ</Link><Link to={`/admin/articles/${item.articleId}/edit`}>แก้ไข</Link></div></td>
-                  </tr>)}
-                </tbody>
-              </table>
-            </div> : <p className="dashboard-empty">ไม่มีบทความที่สร้างหรือเผยแพร่ในเดือนที่เลือก (สามารถเลือกดูเดือนอื่นได้จากตัวเลือกด้านบน)</p>}
+            {monthArticles.length ? <>
+              <ol className="dash-article-list">
+                {visibleMonthArticles.map((item, index) => <li key={item.articleId} className="dash-article-row">
+                  <span className="dash-row-num">{index + 1}</span>
+                  <div className="dash-row-main">
+                    <Link className="dash-row-title" to={`/admin/articles/${item.articleId}/edit`} title={item.title}>{item.title}</Link>
+                    <div className="dash-row-meta">
+                      <StatusBadge status={item.status}/>
+                      <span className="category-chip">{item.categoryName}</span>
+                      <span>{dateLabel(item.publishedAt || item.createdAt)}</span>
+                      {item.imageCount > 0 && <span title="รูปภาพประกอบ">🖼 {item.imageCount}</span>}
+                      {item.hasPdf && <span title="มีไฟล์ PDF">PDF</span>}
+                      {item.hasVideo && <span title="มีวิดีโอ/ลิงก์">🎬</span>}
+                    </div>
+                  </div>
+                  <div className="dash-row-views">
+                    <b>{Number(item.monthViews || 0).toLocaleString('th-TH')}</b>
+                    <small>วิวเดือนนี้</small>
+                  </div>
+                  <div className="dash-row-actions">
+                    <Link to={`/articles/${item.articleId}?preview=1`} target="_blank" rel="opener">ดู</Link>
+                    <Link to={`/admin/articles/${item.articleId}/edit`}>แก้ไข</Link>
+                  </div>
+                </li>)}
+              </ol>
+              <ShowMoreButton expanded={monthExpanded} hiddenCount={monthArticles.length - MONTHLY_PREVIEW_COUNT} onToggle={toggleMonthList} unit="บทความ"/>
+            </> : <p className="dashboard-empty">ไม่มีบทความที่สร้างหรือเผยแพร่ในเดือนนี้ ลองเลือกเดือนอื่นจากตัวเลือกด้านบน</p>}
           </div>
         </>}
       </div>
 
-      <div className="dashboard-panel dashboard-chart-panel">
-        <div className="dashboard-panel-heading">
-          <div><span className="eyebrow">DAILY ARTICLE VIEWS</span><h2>ยอดเข้าชม {insightDays} วันล่าสุด</h2></div>
-          <label className="insights-range-picker">ช่วงเวลา <select aria-label="เลือกช่วงเวลาสถิติยอดเข้าชม" value={insightDays} onChange={(event) => setInsightDays(Number(event.target.value))}><option value={7}>7 วันล่าสุด</option><option value={30}>30 วันล่าสุด</option><option value={90}>90 วันล่าสุด</option></select></label>
-        </div>
+      <div className="dashboard-panel dash-card">
+        <DashSectionTitle icon="📈" title={`ยอดเข้าชม ${insightDays} วันล่าสุด`} hint="จำนวนครั้งที่มีผู้เปิดอ่านคู่มือในแต่ละวัน">
+          <label className="dash-select">
+            <span>ช่วงเวลา</span>
+            <select aria-label="เลือกช่วงเวลาสถิติยอดเข้าชม" value={insightDays} onChange={(event) => setInsightDays(Number(event.target.value))}>
+              <option value={7}>7 วันล่าสุด</option>
+              <option value={30}>30 วันล่าสุด</option>
+              <option value={90}>90 วันล่าสุด</option>
+            </select>
+          </label>
+        </DashSectionTitle>
         {insights.loading ? <p className="dashboard-empty">กำลังโหลดสถิติยอดเข้าชม...</p> : insights.error ? <p className="dashboard-empty" role="alert">{insights.error}</p> : insights.data?.viewsByDay?.length ? <DailyViewsChart rows={insights.data.viewsByDay}/> : <p className="dashboard-empty">ยังไม่มีข้อมูลยอดเข้าชม</p>}
       </div>
 
       <div className="dashboard-columns">
-        <div className="dashboard-panel">
-          <div className="dashboard-panel-heading"><div><span className="eyebrow">NO RESULT SEARCHES</span><h2>คำค้นที่หาไม่เจอ</h2></div><span className="panel-pill panel-pill-warn">โอกาสเขียนคู่มือใหม่</span></div>
-          {insights.loading ? <p className="dashboard-empty">กำลังโหลดสถิติคำค้น...</p> : insights.error ? <p className="dashboard-empty" role="alert">{insights.error}</p> : insights.data?.zeroResultTerms?.length ? <div className="recent-article-list">{insights.data.zeroResultTerms.map((item) => <div className="recent-article-row zero-term-row" key={item.term}><span><b>“{item.term}”</b><small>ค้นหา {item.count.toLocaleString('th-TH')} ครั้ง · ล่าสุด {dateLabel(item.lastSearched)}</small></span><div className="term-row-actions"><Link className="write-guide-btn" to={`/admin/articles/new?title=${encodeURIComponent(item.term)}`}>＋ เขียนคู่มือนี้</Link><button type="button" className="danger-action delete-term-btn" onClick={() => removeSearchTerm(item.term)} aria-label={`ลบคำค้นหา ${item.term}`}>ลบ</button></div></div>)}</div> : <p className="dashboard-empty">ยังไม่มีคำค้นที่ไม่พบผลลัพธ์</p>}
+        <div className="dashboard-panel dash-card">
+          <DashSectionTitle icon="🔍" title="คำค้นที่หาไม่เจอ" hint="ผู้ใช้ค้นแล้วไม่พบคู่มือ — ควรเขียนคู่มือเพิ่ม"/>
+          {insights.loading ? <p className="dashboard-empty">กำลังโหลดสถิติคำค้น...</p> : insights.error ? <p className="dashboard-empty" role="alert">{insights.error}</p> : zeroTerms.length ? <>
+            <ul className="dash-term-list">
+              {visibleZeroTerms.map((item) => <li key={item.term} className="dash-term-row">
+                <div className="dash-term-main">
+                  <b>“{item.term}”</b>
+                  <small>ค้นหา {item.count.toLocaleString('th-TH')} ครั้ง · ล่าสุด {dateLabel(item.lastSearched)}</small>
+                </div>
+                <div className="term-row-actions">
+                  <Link className="write-guide-btn" to={`/admin/articles/new?title=${encodeURIComponent(item.term)}`}>＋ เขียนคู่มือ</Link>
+                  <button type="button" className="danger-action delete-term-btn" onClick={() => removeSearchTerm(item.term)} aria-label={`ลบคำค้นหา ${item.term}`}>ลบ</button>
+                </div>
+              </li>)}
+            </ul>
+            <ShowMoreButton expanded={expandedTerms.zero} hiddenCount={zeroTerms.length - TERM_PREVIEW_COUNT} onToggle={() => setExpandedTerms((v) => ({ ...v, zero: !v.zero }))} unit="คำ"/>
+          </> : <p className="dashboard-empty">ยังไม่มีคำค้นที่ไม่พบผลลัพธ์ 🎉</p>}
         </div>
 
-        <div className="dashboard-panel">
-          <div className="dashboard-panel-heading"><div><span className="eyebrow">POPULAR SEARCH TERMS</span><h2>คำค้นยอดนิยม</h2></div><span className="panel-pill">{insightDays} วันล่าสุด</span></div>
-          {insights.loading ? <p className="dashboard-empty">กำลังโหลดคำค้นยอดนิยม...</p> : insights.error ? <p className="dashboard-empty" role="alert">{insights.error}</p> : insights.data?.topTerms?.length ? <div className="admin-table-wrap"><table className="admin-table dashboard-table dashboard-compact-table"><thead><tr><th>คำค้น</th><th>ความถี่</th><th>ผลลัพธ์เฉลี่ย</th><th>จัดการ</th></tr></thead><tbody>{insights.data.topTerms.map((item, idx) => <tr key={item.term}><td><span className={`rank-badge rank-${idx + 1}`}>{idx + 1}</span> <b>{item.term}</b></td><td><div className="term-bar-cell"><b>{item.count.toLocaleString('th-TH')} ครั้ง</b><div className="progress-track"><span style={{ width: `${Math.max(10, Math.round(item.count * 100 / maxTopTermCount))}%` }}/></div></div></td><td><span className={`result-count-pill${item.avgResults === 0 ? ' is-zero' : ''}`}>{item.avgResults.toLocaleString('th-TH')} บทความ</span></td><td><button type="button" className="danger-action delete-term-btn" onClick={() => removeSearchTerm(item.term)} aria-label={`ลบคำค้นหา ${item.term}`}>ลบ</button></td></tr>)}</tbody></table></div> : <p className="dashboard-empty">ยังไม่มีข้อมูลคำค้น</p>}
+        <div className="dashboard-panel dash-card">
+          <DashSectionTitle icon="🔥" title="คำค้นยอดนิยม" hint={`คำที่ผู้ใช้ค้นหาบ่อยที่สุดใน ${insightDays} วันล่าสุด`}/>
+          {insights.loading ? <p className="dashboard-empty">กำลังโหลดคำค้นยอดนิยม...</p> : insights.error ? <p className="dashboard-empty" role="alert">{insights.error}</p> : topTerms.length ? <>
+            <ul className="dash-term-list">
+              {visibleTopTerms.map((item, idx) => <li key={item.term} className="dash-term-row">
+                <span className={`rank-badge rank-${idx + 1}`}>{idx + 1}</span>
+                <div className="dash-term-main">
+                  <b>{item.term}</b>
+                  <div className="dash-term-bar"><span style={{ width: `${Math.max(8, Math.round(item.count * 100 / maxTopTermCount))}%` }}/></div>
+                </div>
+                <span className="dash-term-count">{item.count.toLocaleString('th-TH')} ครั้ง</span>
+                <button type="button" className="danger-action delete-term-btn" onClick={() => removeSearchTerm(item.term)} aria-label={`ลบคำค้นหา ${item.term}`}>ลบ</button>
+              </li>)}
+            </ul>
+            <ShowMoreButton expanded={expandedTerms.top} hiddenCount={topTerms.length - TERM_PREVIEW_COUNT} onToggle={() => setExpandedTerms((v) => ({ ...v, top: !v.top }))} unit="คำ"/>
+          </> : <p className="dashboard-empty">ยังไม่มีข้อมูลคำค้น</p>}
         </div>
       </div>
 
-      <div className="dashboard-panel dashboard-tabbed-panel">
+      <div id="dash-overview-tabs" className="dashboard-panel dash-card dashboard-tabbed-panel">
         <div className="dashboard-panel-heading dashboard-tabs-head">
           <div className="admin-tabs" role="tablist" aria-label="ข้อมูลสรุปคลังความรู้">
-            <button type="button" role="tab" aria-selected={overviewTab === 'popular'} className={overviewTab === 'popular' ? 'active' : ''} onClick={() => setOverviewTab('popular')}>5 อันดับบทความยอดนิยม</button>
-            <button type="button" role="tab" aria-selected={overviewTab === 'categories'} className={overviewTab === 'categories' ? 'active' : ''} onClick={() => setOverviewTab('categories')}>สัดส่วนตามหมวดหมู่</button>
-            <button type="button" role="tab" aria-selected={overviewTab === 'activity'} className={overviewTab === 'activity' ? 'active' : ''} onClick={() => setOverviewTab('activity')}>อัปเดตล่าสุด & งานรอจัดการ {pendingCount > 0 && <span className="tab-count-badge">{pendingCount}</span>}</button>
+            <button type="button" role="tab" aria-selected={overviewTab === 'popular'} className={overviewTab === 'popular' ? 'active' : ''} onClick={() => setOverviewTab('popular')}>🏆 บทความยอดนิยม</button>
+            <button type="button" role="tab" aria-selected={overviewTab === 'categories'} className={overviewTab === 'categories' ? 'active' : ''} onClick={() => setOverviewTab('categories')}>▣ ตามหมวดหมู่</button>
+            <button type="button" role="tab" aria-selected={overviewTab === 'activity'} className={overviewTab === 'activity' ? 'active' : ''} onClick={() => setOverviewTab('activity')}>📝 งานรอจัดการ {pendingCount > 0 && <span className="tab-count-badge">{pendingCount}</span>}</button>
           </div>
           <Link to={overviewTab === 'categories' ? '/admin/categories' : '/admin/articles'}>{overviewTab === 'categories' ? 'จัดการหมวดหมู่ →' : 'จัดการบทความทั้งหมด →'}</Link>
         </div>
 
-        {overviewTab === 'popular' && ((dashboard.topArticles || []).length ? <div className="admin-table-wrap"><table className="admin-table dashboard-table"><thead><tr><th>ชื่อบทความ</th><th>หมวดหมู่</th><th>ยอดวิว</th><th>ความพึงพอใจ</th><th>ทางลัด</th></tr></thead><tbody>{(dashboard.topArticles || []).map((article, index) => <tr key={article.articleId}><td><div className="ranked-title"><span className={`rank-badge rank-${index + 1}`}>{index + 1}</span><b>{article.title}</b></div></td><td><span className="category-chip">{article.category?.categoryName || '—'}</span></td><td><b className="metric-num">{Number(article.viewCount || 0).toLocaleString('th-TH')}</b> <small>ครั้ง</small></td><td>{article.feedbackCount ? <div className="satisfaction-cell"><b>{article.helpfulPercent}%</b> <small>({article.helpfulCount}/{article.feedbackCount})</small><div className="progress-track satisfaction-track"><span style={{ width: `${article.helpfulPercent}%` }}/></div></div> : <span className="admin-muted">ยังไม่มีผลประเมิน</span>}</td><td><div className="admin-row-actions"><Link to={`/articles/${article.articleId}?preview=1`} target="_blank" rel="opener">ดูหน้าเว็บ</Link><Link to={`/admin/articles/${article.articleId}/edit`}>แก้ไข</Link></div></td></tr>)}</tbody></table></div> : <div className="dashboard-empty">ยังไม่มีบทความเผยแพร่</div>)}
+        {overviewTab === 'popular' && ((dashboard.topArticles || []).length ? <ol className="dash-article-list">
+          {(dashboard.topArticles || []).map((article, index) => <li key={article.articleId} className="dash-article-row">
+            <span className={`rank-badge rank-${index + 1}`}>{index + 1}</span>
+            <div className="dash-row-main">
+              <Link className="dash-row-title" to={`/admin/articles/${article.articleId}/edit`} title={article.title}>{article.title}</Link>
+              <div className="dash-row-meta">
+                <span className="category-chip">{article.category?.categoryName || '—'}</span>
+                <span>{article.feedbackCount ? `พึงพอใจ ${article.helpfulPercent}% (${article.helpfulCount}/${article.feedbackCount})` : 'ยังไม่มีผลประเมิน'}</span>
+              </div>
+            </div>
+            <div className="dash-row-views">
+              <b>{Number(article.viewCount || 0).toLocaleString('th-TH')}</b>
+              <small>วิวสะสม</small>
+            </div>
+            <div className="dash-row-actions">
+              <Link to={`/articles/${article.articleId}?preview=1`} target="_blank" rel="opener">ดู</Link>
+              <Link to={`/admin/articles/${article.articleId}/edit`}>แก้ไข</Link>
+            </div>
+          </li>)}
+        </ol> : <div className="dashboard-empty">ยังไม่มีบทความเผยแพร่</div>)}
 
-        {overviewTab === 'categories' && <div className="admin-table-wrap"><table className="admin-table dashboard-table"><thead><tr><th>หมวดหมู่</th><th>จำนวนบทความ</th><th>ยอดเข้าชมสะสม</th><th>สัดส่วนคลังความรู้</th><th>เปิดรายการ</th></tr></thead><tbody>{categoryRows.map((category) => { const count = category._count?.articles || 0; const share = Math.round(count * 100 / totalCategoryArticles); return <tr key={category.categoryId}><td><b>{category.categoryName}</b></td><td><b>{count}</b> <small>บทความ</small></td><td><b className="metric-num">{Number(category.totalViews || 0).toLocaleString('th-TH')}</b> <small>ครั้ง</small></td><td><div className="category-share-cell"><div className="progress-track"><span style={{ width: `${Math.round(count * 100 / maxCategoryCount)}%` }}/></div><small>{share}%</small></div></td><td><Link to={`/admin/articles?category=${category.categoryId}`}>ดูบทความ →</Link></td></tr> })}</tbody></table></div>}
+        {overviewTab === 'categories' && <ul className="dash-category-list">
+          {categoryRows.map((category) => {
+            const count = category._count?.articles || 0
+            const share = Math.round(count * 100 / totalCategoryArticles)
+            return <li key={category.categoryId} className="dash-category-row">
+              <div className="dash-category-main">
+                <Link to={`/admin/articles?category=${category.categoryId}`}><b>{category.categoryName}</b></Link>
+                <small>{count} บทความ · เข้าชม {Number(category.totalViews || 0).toLocaleString('th-TH')} ครั้ง</small>
+              </div>
+              <div className="dash-category-bar"><span style={{ width: `${Math.round(count * 100 / maxCategoryCount)}%` }}/></div>
+              <span className="dash-category-share">{share}%</span>
+            </li>
+          })}
+        </ul>}
 
         {overviewTab === 'activity' && <div className="dashboard-columns dashboard-activity-grid">
           <div>
-            <h3 className="subpanel-title">บทความที่อัปเดตล่าสุด</h3>
-            <div className="recent-article-list">{(dashboard.recentArticles || []).map((article) => <div className="recent-article-row" key={article.articleId}><Link to={`/admin/articles/${article.articleId}/edit`}><span>{article.title}</span><small><StatusBadge status={article.status}/> · อัปเดตเมื่อ {dateLabel(article.updatedAt)}</small></Link>{article.status === 'DRAFT' && <button onClick={() => publishNow(article)}>เผยแพร่ทันที</button>}</div>)}</div>
+            <h3 className="subpanel-title">ฉบับร่างรอเผยแพร่</h3>
+            {draftCount ? <div className="recent-article-list">
+              {(dashboard.pendingDrafts || []).map((article) => <div className="recent-article-row" key={`draft-${article.articleId}`}><Link to={`/admin/articles/${article.articleId}/edit`}><span>{article.title}</span><small><StatusBadge status="DRAFT"/> · {article.category?.categoryName || '—'} · {dateLabel(article.updatedAt)}</small></Link><button onClick={() => publishNow(article)}>เผยแพร่ทันที</button></div>)}
+            </div> : <p className="dashboard-empty">ไม่มีฉบับร่างค้าง ✓</p>}
           </div>
           <div>
-            <h3 className="subpanel-title">ฉบับร่าง & ข้อเสนอแนะที่ควรตรวจสอบ</h3>
-            {(dashboard.pendingDrafts || []).length || (dashboard.negativeFeedback || []).length ? <div className="recent-article-list">
-              {(dashboard.pendingDrafts || []).map((article) => <div className="recent-article-row" key={`draft-${article.articleId}`}><Link to={`/admin/articles/${article.articleId}/edit`}><span>{article.title}</span><small><StatusBadge status="DRAFT"/> · {article.category?.categoryName || '—'} · {dateLabel(article.updatedAt)}</small></Link><button onClick={() => publishNow(article)}>เผยแพร่ทันที</button></div>)}
-              {(dashboard.negativeFeedback || []).map((article) => <Link key={`fb-${article.articleId}`} to={`/admin/articles/${article.articleId}/edit`}><span>{article.title}</span><small>👎 ไม่ช่วยแก้ปัญหา {article.notHelpfulCount} · 👍 มีประโยชน์ {article.helpfulCount}</small></Link>)}
-            </div> : <p className="dashboard-empty">ไม่มีฉบับร่างค้างหรือข้อเสนอแนะเชิงลบในขณะนี้</p>}
+            <h3 className="subpanel-title">บทความที่ผู้อ่านแจ้งว่ายังไม่ช่วย</h3>
+            {negativeCount ? <div className="recent-article-list">
+              {(dashboard.negativeFeedback || []).map((article) => <Link key={`fb-${article.articleId}`} to={`/admin/articles/${article.articleId}/edit`}><span>{article.title}</span><small>👎 ไม่ช่วย {article.notHelpfulCount} · 👍 มีประโยชน์ {article.helpfulCount}</small></Link>)}
+            </div> : <p className="dashboard-empty">ไม่มีข้อเสนอแนะเชิงลบ ✓</p>}
+            <h3 className="subpanel-title dash-subpanel-gap">อัปเดตล่าสุด</h3>
+            <div className="recent-article-list">{(dashboard.recentArticles || []).map((article) => <div className="recent-article-row" key={article.articleId}><Link to={`/admin/articles/${article.articleId}/edit`}><span>{article.title}</span><small><StatusBadge status={article.status}/> · {dateLabel(article.updatedAt)}</small></Link></div>)}</div>
           </div>
         </div>}
       </div>
