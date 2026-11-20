@@ -224,8 +224,15 @@ function ArticlePage() {
   const [sending, setSending] = useState(false)
   const [lightbox, setLightbox] = useState(false)
   const [activeImageState, setActiveImageState] = useState({ articleId: '', index: 0 })
+  const [fontScale, setFontScale] = useState(() => {
+    try { return window.localStorage.getItem('ict-reader-font-scale') || 'normal' } catch { return 'normal' }
+  })
   const [copied, setCopied] = useState(false)
   const [copyError, setCopyError] = useState('')
+  function changeFontScale(scale) {
+    setFontScale(scale)
+    try { window.localStorage.setItem('ict-reader-font-scale', scale) } catch { /* Ignore storage restrictions. */ }
+  }
   const related = usePublicData(article ? `/articles?category=${article.categoryId}&limit=6` : '')
   useDocumentTitle(article?.title || (loading ? 'กำลังโหลดบทความ' : 'ไม่พบบทความ'))
   const voteValue = vote.id === id ? vote.value : ''
@@ -323,7 +330,7 @@ function ArticlePage() {
     </header>
 
     <div className="detail-layout">
-      <article className="detail-main">
+      <article className={`detail-main reader-scale-${fontScale}`}>
         {currentImage ? <div className="detail-gallery-box">
           <button className="detail-image-button" onClick={() => setLightbox(true)} aria-label="ขยายภาพประกอบ">
             <img className="detail-image" src={assetUrl(currentImage)} alt={`ภาพประกอบ ${article.title} (${activeImageIdx + 1}/${galleryImages.length})`}/>
@@ -344,7 +351,18 @@ function ArticlePage() {
         </div> : <div className="detail-placeholder" aria-label={`หมวดหมู่ ${article.category?.categoryName}`}><span>{categoryIcons[(Number(article.categoryId || 1) - 1) % categoryIcons.length] || '▣'}</span><b>{article.category?.categoryName || 'คู่มือ ICT'}</b></div>}
 
         <div id="article-intro" className="article-content">
-          <div className="content-section-bar"><span>📖 รายละเอียดและคำอธิบายประกอบ</span><small>อ่านทำความเข้าใจก่อนเริ่มปฏิบัติตามขั้นตอน</small></div>
+          <div className="content-section-bar">
+            <div>
+              <span>📖 รายละเอียดและคำอธิบายประกอบ</span>
+              <small>อ่านทำความเข้าใจก่อนเริ่มปฏิบัติตามขั้นตอน</small>
+            </div>
+            <div className="font-scale-controls" role="group" aria-label="ปรับขนาดตัวอักษรเนื้อหาบทความ">
+              <small>ขนาดตัวอักษร</small>
+              <button type="button" className={fontScale === 'normal' ? 'active' : ''} onClick={() => changeFontScale('normal')} aria-pressed={fontScale === 'normal'} title="ขนาดตัวอักษรปกติ">ก</button>
+              <button type="button" className={fontScale === 'large' ? 'active' : ''} onClick={() => changeFontScale('large')} aria-pressed={fontScale === 'large'} title="ขนาดตัวอักษรใหญ่">ก+</button>
+              <button type="button" className={fontScale === 'xlarge' ? 'active' : ''} onClick={() => changeFontScale('xlarge')} aria-pressed={fontScale === 'xlarge'} title="ขนาดตัวอักษรใหญ่มาก">ก++</button>
+            </div>
+          </div>
           {paragraphs.map((paragraph, index) => {
             const headingMatch = paragraph.match(/^(เกริ่นนำ|ข้อควรทราบ[^\n]*|คำแนะนำ[^\n]*|สาเหตุ[^\n]*)\s*\n([\s\S]*)$/)
             return headingMatch ? <section key={`paragraph-${index}`} className="content-callout-block"><h2>{headingMatch[1]}</h2><p>{headingMatch[2]}</p></section> : <p key={`paragraph-${index}`}>{paragraph}</p>
