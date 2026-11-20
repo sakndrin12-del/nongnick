@@ -347,20 +347,23 @@ export function LanguageProvider({ children }) {
         ...contact,
         location: contact.location
           ? contact.location
+              .replace('ชั้น 2 ตลาดสดเทศบาล 1 ถนนกลางเมือง ต.ในเมือง อ.เมืองขอนแก่น จ.ขอนแก่น 40000', '2nd Floor, Municipal Fresh Market 1, Klang Mueang Rd., Nai Mueang, Mueang Khon Kaen, Khon Kaen 40000')
               .replace('ศูนย์พัฒนาทักษะและการเรียนรู้ ICT เทศบาลนครขอนแก่น', 'Khon Kaen Municipality ICT Skill Development & Learning Center')
               .replace('ถ.ประชาสำราญ ต.ในเมือง อ.เมืองขอนแก่น จ.ขอนแก่น 40000', 'Prachasamran Rd., Nai Mueang, Mueang Khon Kaen, Khon Kaen 40000')
           : contact.location,
         hours: contact.hours
           ? contact.hours
+              .replace('อังคาร – อาทิตย์', 'Tuesday – Sunday')
               .replace('วันอังคาร - วันอาทิตย์', 'Tuesday – Sunday')
               .replace('วันจันทร์ - วันศุกร์', 'Monday – Friday')
               .replace('เวลา', '')
               .replace('น.', '')
-              .replace('(หยุดวันจันทร์และวันหยุดนักขัตฤกษ์)', '(Closed on Mondays and Public Holidays)')
+              .replace('(หยุดวันจันทร์และวันหยุดนักขัตฤกษ์)', '(Closed on Mondays & Public Holidays)')
               .trim()
           : contact.hours,
         note: contact.note
           ? contact.note
+              .replace('ศูนย์พัฒนาทักษะและการเรียนรู้ ICT เทศบาลนครขอนแก่น บริการพื้นที่การเรียนรู้ ห้องอบรมคอมพิวเตอร์ และให้คำปรึกษาด้านไอที', 'Khon Kaen Municipality ICT Skill Development & Learning Center provides digital learning spaces, computer training rooms, and IT consultation.')
               .replace('ติดต่อสอบถามข้อมูลการอบรม จองห้องปฏิบัติการคอมพิวเตอร์ หรือแจ้งปัญหาการใช้งานระบบเครือข่ายและอุปกรณ์ไอทีในเวลาทำการ', 'Contact us during service hours for IT training inquiries, computer lab reservations, or network & IT troubleshooting.')
           : contact.note,
       }

@@ -90,9 +90,165 @@ function ContactCard({ contact: rawContact, title, className = '' }) {
 }
 
 function Footer() {
-  const { t } = useLang()
-  const contact = usePublicData('/settings/contact')
-  return <footer><div className="shell footer-row"><div className="footer-brand-col"><div className="footer-logos"><img className="footer-logo-seal" src="/logo-khonkaen.png" alt="ตราเทศบาลนครขอนแก่น"/><span className="brand-logo-divider"/><img className="footer-logo-ict" src="/logo-ict.png" alt="ศูนย์พัฒนาทักษะและการเรียนรู้ ICT เทศบาลนครขอนแก่น"/></div><b>{t('คลังความรู้และคู่มือบริการไอที (KKICT)', 'IT Knowledge Base & Service Guides (KKICT)')}</b><p>{t('ศูนย์พัฒนาทักษะและการเรียนรู้ ICT เทศบาลนครขอนแก่น · แหล่งรวมคู่มือและวิธีแก้ไขปัญหาด้านเทคโนโลยีสารสนเทศสำหรับบุคลากรและประชาชน', 'Khon Kaen Municipality ICT Learning Center · Comprehensive IT manuals and self-service troubleshooting guides for staff and citizens.')}</p><span>{t('ศูนย์ ICT ขอนแก่น', 'Khon Kaen ICT Center')} · <a href="https://www.kkict.net/" target="_blank" rel="noreferrer">www.kkict.net ↗</a></span></div><ContactCard contact={contact.data} title={t('ติดต่อศูนย์ ICT', 'Contact ICT Center')} className="footer-contact-card"/></div></footer>
+  const { t, translateCategory, translateContact } = useLang()
+  const contactRes = usePublicData('/settings/contact')
+  const categoriesRes = usePublicData('/categories')
+  const rawContact = contactRes.data || {}
+  const contact = translateContact(rawContact)
+  const phone = (typeof contact?.phone === 'string' && contact.phone.trim()) || '084-583-0208'
+  const lineId = (typeof contact?.lineId === 'string' && contact.lineId.trim()) || 'kkict.net'
+  const lineUrl = safeHttpsHref(contact?.lineUrl) || 'https://www.kkict.net/'
+  const email = (typeof contact?.email === 'string' && contact.email.trim()) || 'info.kkict@gmail.com'
+  const location = (typeof contact?.location === 'string' && contact.location.trim()) || t(
+    'ชั้น 2 ตลาดสดเทศบาล 1 ถนนกลางเมือง ต.ในเมือง อ.เมืองขอนแก่น จ.ขอนแก่น 40000',
+    '2nd Floor, Municipal Fresh Market 1, Klang Mueang Rd., Nai Mueang, Mueang Khon Kaen, Khon Kaen 40000',
+  )
+  const hours = (typeof contact?.hours === 'string' && contact.hours.trim()) || t(
+    'อังคาร – อาทิตย์ เวลา 09:00 – 17:00 น. (หยุดวันจันทร์และวันหยุดนักขัตฤกษ์)',
+    'Tuesday – Sunday 09:00 – 17:00 (Closed on Mondays & Public Holidays)',
+  )
+  const note = (typeof contact?.note === 'string' && contact.note.trim()) || t(
+    'ศูนย์พัฒนาทักษะและการเรียนรู้ ICT เทศบาลนครขอนแก่น บริการพื้นที่การเรียนรู้ ห้องอบรมคอมพิวเตอร์ และให้คำปรึกษาด้านไอที',
+    'Khon Kaen Municipality ICT Skill Development & Learning Center provides digital learning spaces, computer training rooms, and IT consultation.',
+  )
+  const phoneHref = safePhoneHref(phone) || 'tel:0845830208'
+  const emailHref = safeEmailHref(email) || 'mailto:info.kkict@gmail.com'
+  const fallbackCategories = [
+    { categoryId: 1, categoryName: 'คอมพิวเตอร์และอุปกรณ์' },
+    { categoryId: 2, categoryName: 'ระบบเครือข่ายและอินเทอร์เน็ต' },
+    { categoryId: 3, categoryName: 'โปรแกรมและซอฟต์แวร์' },
+    { categoryId: 4, categoryName: 'เครื่องพิมพ์และอุปกรณ์ต่อพ่วง' },
+    { categoryId: 5, categoryName: 'ระบบสารสนเทศและบริการออนไลน์' },
+  ]
+  const categoryList = (categoriesRes.data?.length ? categoriesRes.data : fallbackCategories).map(translateCategory)
+  let isAdmin = false
+  try { isAdmin = Boolean(window.sessionStorage.getItem('ict-admin-token')) } catch { /* Ignore storage restrictions. */ }
+  const staffPath = isAdmin ? '/admin' : '/admin/login'
+
+  return <footer className="site-footer">
+    <div className="shell footer-grid">
+      <div className="footer-col footer-brand-col">
+        <div className="footer-brand-head">
+          <div className="footer-brand-emblems">
+            <span className="footer-emblem-circle">
+              <img src="/logo-khonkaen.png" alt="ตราเทศบาลนครขอนแก่น"/>
+            </span>
+            <span className="footer-emblem-tile">
+              <img src="/logo-ict.png" alt="ศูนย์พัฒนาทักษะและการเรียนรู้ ICT เทศบาลนครขอนแก่น"/>
+            </span>
+          </div>
+          <div className="footer-brand-titles">
+            <b>{t('คลังความรู้และคู่มือบริการไอที (KKICT)', 'IT Knowledge Base & Service Guides (KKICT)')}</b>
+            <small>{t('เทศบาลนครขอนแก่น · KHON KAEN ICT LEARNING CENTER', 'KHON KAEN MUNICIPALITY · KHON KAEN ICT LEARNING CENTER')}</small>
+          </div>
+        </div>
+        <p className="footer-brand-desc">
+          {t(
+            'ศูนย์พัฒนาทักษะและการเรียนรู้ ICT เทศบาลนครขอนแก่น แหล่งรวบรวมคู่มือมาตรฐาน ขั้นตอนการตั้งค่า และวิธีแก้ไขปัญหาด้านเทคโนโลยีสารสนเทศ คอมพิวเตอร์ เครือข่าย และอุปกรณ์สำนักงานด้วยตนเอง สำหรับบุคลากรและประชาชน',
+            'Khon Kaen Municipality ICT Skill Development & Learning Center — your central repository for standardized IT manuals, setup procedures, and self-service troubleshooting guides for computers, networks, and office equipment.',
+          )}
+        </p>
+        <div className="footer-brand-site">
+          <span className="footer-gold-dot" aria-hidden="true"/>
+          <span>
+            {t('ศูนย์พัฒนาทักษะและการเรียนรู้ ICT ขอนแก่น', 'Khon Kaen ICT Learning Center')} · <a href="https://www.kkict.net/" target="_blank" rel="noreferrer">www.kkict.net ↗</a>
+          </span>
+        </div>
+      </div>
+
+      <div className="footer-col">
+        <h3 className="footer-heading">{t('เกี่ยวกับเรา', 'About Us')}</h3>
+        <ul className="footer-links">
+          <li><Link to="/">{t('หน้าแรกคลังความรู้', 'Knowledge Base Home')}</Link></li>
+          <li><Link to="/articles">{t('คลังความรู้และคู่มือทั้งหมด', 'All Guides & Manuals')}</Link></li>
+          <li><Link to="/search">{t('ค้นหาวิธีแก้ไขปัญหาไอที', 'Search IT Troubleshooting')}</Link></li>
+          <li><Link to="/articles?sort=popular">{t('คู่มือยอดนิยมประจำศูนย์', 'Most Popular Guides')}</Link></li>
+          <li><a href="https://www.kkict.net/" target="_blank" rel="noreferrer">{t('เว็บไซต์หลัก kkict.net ↗', 'Main Website kkict.net ↗')}</a></li>
+          <li><Link to={staffPath}>{t('เข้าสู่ระบบเจ้าหน้าที่', 'Staff Portal Login')}</Link></li>
+        </ul>
+      </div>
+
+      <div className="footer-col">
+        <h3 className="footer-heading">{t('หมวดหมู่คู่มือบริการ', 'Service Guide Categories')}</h3>
+        <ul className="footer-links">
+          {categoryList.map((cat) => (
+            <li key={cat.categoryId}>
+              <Link to={`/articles?category=${cat.categoryId}`}>{cat.categoryName}</Link>
+            </li>
+          ))}
+        </ul>
+      </div>
+
+      <div className="footer-col footer-contact-col">
+        <h3 className="footer-heading">{t('ติดต่อศูนย์ ICT', 'Contact ICT Center')}</h3>
+        <ul className="footer-contact-list">
+          <li>
+            <span className="footer-contact-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z"/><circle cx="12" cy="10" r="3"/></svg>
+            </span>
+            <span>{location}</span>
+          </li>
+          <li>
+            <span className="footer-contact-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+            </span>
+            <span>{t('โทรศัพท์:', 'Phone:')} <a href={phoneHref}><b>{phone}</b></a></span>
+          </li>
+          <li>
+            <span className="footer-contact-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>
+            </span>
+            <span>{t('อีเมล:', 'Email:')} <a href={emailHref}><b>{email}</b></a></span>
+          </li>
+          <li>
+            <span className="footer-contact-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
+            </span>
+            <span>LINE: <a href={lineUrl} target="_blank" rel="noreferrer"><b>{lineId}</b></a></span>
+          </li>
+          <li>
+            <span className="footer-contact-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><polyline points="12 6 12 12 16 14"/></svg>
+            </span>
+            <span>{t('เวลาทำการ:', 'Hours:')} {hours}</span>
+          </li>
+        </ul>
+        {note && <p className="footer-contact-note">{note}</p>}
+        <div className="footer-social-row" aria-label={t('ช่องทางติดต่อโซเชียล', 'Social & contact links')}>
+          <a href="https://www.facebook.com/" target="_blank" rel="noreferrer" aria-label="Facebook">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M15.12 5.32H17V2.14A26.11 26.11 0 0 0 14.26 2c-2.72 0-4.58 1.66-4.58 4.7v2.62H6.61v3.56h3.07V22h3.68v-9.12h3.06l.46-3.56h-3.52V7.05c0-1.05.29-1.73 1.76-1.73z"/></svg>
+          </a>
+          <a href={lineUrl} target="_blank" rel="noreferrer" aria-label="LINE">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M20 10.6C20 6.9 16.4 4 12 4S4 6.9 4 10.6c0 3.3 2.9 6 6.8 6.5.3.1.6.2.7.5.1.2 0 .5 0 .7l-.1.7c0 .2-.2.8.7.4.9-.4 4.7-2.8 6.4-4.7 1-1.2 1.5-2.6 1.5-4.1z"/></svg>
+          </a>
+          <a href="https://www.kkict.net/" target="_blank" rel="noreferrer" aria-label="Website kkict.net">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+          </a>
+          <a href={emailHref} aria-label="Email">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="4" width="20" height="16" rx="2"/><path d="m22 7-8.97 5.7a1.94 1.94 0 0 1-2.06 0L2 7"/></svg>
+          </a>
+          <a href={phoneHref} aria-label="Phone">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z"/></svg>
+          </a>
+        </div>
+      </div>
+    </div>
+
+    <div className="footer-bottom">
+      <div className="shell footer-bottom-inner">
+        <span>Copyright © 2026 {t('ศูนย์พัฒนาทักษะและการเรียนรู้ ICT เทศบาลนครขอนแก่น (KKICT)', 'Khon Kaen Municipality ICT Learning Center (KKICT)')}. All rights reserved.</span>
+        <nav className="footer-bottom-links" aria-label={t('ลิงก์ส่วนท้าย', 'Footer bottom links')}>
+          <a href="https://www.kkict.net/" target="_blank" rel="noreferrer">{t('เว็บไซต์หลัก kkict.net', 'Main Website kkict.net')}</a>
+          <span aria-hidden="true">|</span>
+          <Link to="/articles">{t('คลังความรู้ทั้งหมด', 'All Guides')}</Link>
+          <span aria-hidden="true">|</span>
+          <Link to="/search">{t('ค้นหาคู่มือ', 'Search Guides')}</Link>
+          <span aria-hidden="true">|</span>
+          <Link to={staffPath}>{t('สำหรับเจ้าหน้าที่', 'For Staff')}</Link>
+        </nav>
+      </div>
+    </div>
+  </footer>
 }
 
 function SearchBox({ initial = '' }) {
