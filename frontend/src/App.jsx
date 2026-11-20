@@ -223,6 +223,7 @@ function ArticlePage() {
   const [vote, setVote] = useState({ id: '', value: '', count: null, helpfulCount: null })
   const [sending, setSending] = useState(false)
   const [lightbox, setLightbox] = useState(false)
+  const [showPdfViewer, setShowPdfViewer] = useState(false)
   const [activeImageState, setActiveImageState] = useState({ articleId: '', index: 0 })
   const [fontScale, setFontScale] = useState(() => {
     try { return window.localStorage.getItem('ict-reader-font-scale') || 'normal' } catch { return 'normal' }
@@ -312,6 +313,7 @@ function ArticlePage() {
           </a>
           <button className="print-button" onClick={() => window.print()}>▤ พิมพ์คู่มือ / บันทึกเป็น PDF</button>
           {mediaLink && <a className="print-button" href="#article-video">▶ ดูวิดีโอ / ลิงก์ประกอบ</a>}
+          {article.pdfFile && <button type="button" className="print-button" onClick={() => { setShowPdfViewer(true); window.setTimeout(() => document.getElementById('article-pdf')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 60) }}>👁 อ่าน PDF บนเว็บ</button>}
           {article.pdfFile && <a className="download-button hero-pdf-btn" href={assetUrl(article.pdfFile)} download>⬇ ดาวน์โหลด PDF</a>}
           {copyError && <span role="status">{copyError}</span>}
         </div>
@@ -398,7 +400,43 @@ function ArticlePage() {
           </a>}
         </section>}
 
-        {article.pdfFile && <section id="article-pdf" className="pdf-banner"><div className="pdf-banner-info"><span className="pdf-emblem" aria-hidden="true">PDF</span><div><b>คู่มือฉบับสมบูรณ์พร้อมพิมพ์ (PDF A4)</b><p>เปิดอ่านในเบราว์เซอร์หรือดาวน์โหลดเก็บไว้ในเครื่องเพื่อเปิดดูแบบออฟไลน์ได้ทันที</p></div></div><div><a className="print-button" href={assetUrl(article.pdfFile)} target="_blank" rel="noreferrer">เปิดอ่านไฟล์ PDF</a><a className="download-button" href={assetUrl(article.pdfFile)} download>⬇ ดาวน์โหลดไฟล์ PDF</a></div></section>}
+        {article.pdfFile && <section id="article-pdf" className={`pdf-banner${showPdfViewer ? ' is-expanded' : ''}`}>
+          <div className="pdf-banner-top">
+            <div className="pdf-banner-info">
+              <span className="pdf-emblem" aria-hidden="true">PDF</span>
+              <div>
+                <b>คู่มือฉบับสมบูรณ์พร้อมพิมพ์ (PDF A4)</b>
+                <p>กดเปิดอ่านบนหน้าเว็บนี้ได้ทันทีเหมือน E-Book หรือดาวน์โหลดเก็บไว้ในเครื่องเพื่อเปิดดูแบบออฟไลน์</p>
+              </div>
+            </div>
+            <div className="pdf-banner-actions">
+              <button
+                type="button"
+                className={`pdf-toggle-btn${showPdfViewer ? ' active' : ''}`}
+                aria-expanded={showPdfViewer}
+                onClick={() => setShowPdfViewer((v) => !v)}
+              >
+                {showPdfViewer ? '▴ ซ่อนหน้าต่างอ่าน PDF' : '👁 เปิดอ่าน PDF บนหน้าเว็บนี้'}
+              </button>
+              <a className="print-button" href={assetUrl(article.pdfFile)} target="_blank" rel="noreferrer">↗ เปิดแท็บใหม่</a>
+              <a className="download-button" href={assetUrl(article.pdfFile)} download>⬇ ดาวน์โหลด PDF</a>
+            </div>
+          </div>
+          {showPdfViewer && <div className="pdf-viewer-shell" role="region" aria-label="หน้าต่างอ่านเอกสารคู่มือ PDF">
+            <div className="pdf-viewer-bar">
+              <span>📄 กำลังแสดงคู่มือ PDF: <b>{article.title}</b></span>
+              <div className="pdf-viewer-tools">
+                <a href={assetUrl(article.pdfFile)} target="_blank" rel="noreferrer">↗ ขยายเต็มจอในแท็บใหม่</a>
+                <button type="button" onClick={() => setShowPdfViewer(false)}>× ปิดหน้าต่างอ่าน</button>
+              </div>
+            </div>
+            <iframe
+              className="pdf-viewer-frame"
+              src={`${assetUrl(article.pdfFile)}#view=FitH`}
+              title={`เอกสารคู่มือ PDF ${article.title}`}
+            />
+          </div>}
+        </section>}
 
         {Array.isArray(article.keywords) && article.keywords.length > 0 && <div className="article-keywords" aria-label="คำสำคัญของบทความ"><b>คำค้นและหัวข้อที่เกี่ยวข้อง:</b><div className="keyword-list">{article.keywords.map((keyword) => <Link key={keyword} className="keyword-tag" to={`/search?q=${encodeURIComponent(keyword)}`}>#{keyword}</Link>)}</div></div>}
 
