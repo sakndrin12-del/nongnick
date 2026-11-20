@@ -3504,6 +3504,295 @@ footer::before { top: 0; }
   min-width: 0;
 }
 
+/* ---------- 4-Column Site Footer (Matching KKICT Reference Design) ---------- */
+.site-footer {
+  position: relative;
+  border-top: 0;
+  background:
+    radial-gradient(640px 380px at 88% 8%, rgba(245, 158, 11, .16), transparent 72%),
+    radial-gradient(520px 340px at 12% 90%, rgba(14, 129, 153, .22), transparent 70%),
+    linear-gradient(180deg, #052833 0%, #031d26 100%);
+  color: rgba(255, 255, 255, .86);
+}
+.site-footer::before {
+  position: absolute;
+  top: 0;
+  right: 0;
+  left: 0;
+  height: 3px;
+  background: var(--mudmee-band);
+  content: '';
+}
+.footer-grid {
+  display: grid;
+  grid-template-columns: 1.35fr 0.9fr 0.95fr 1.25fr;
+  gap: 36px;
+  padding: 52px 0 42px;
+}
+.footer-col {
+  min-width: 0;
+}
+.footer-brand-head {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  margin-bottom: 18px;
+}
+.footer-brand-emblems {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  flex: none;
+  margin-top: 2px;
+}
+.footer-emblem-circle {
+  display: grid;
+  width: 44px;
+  height: 44px;
+  place-items: center;
+  padding: 2px;
+  border: 1.5px solid rgba(253, 224, 71, .85);
+  border-radius: 50%;
+  background: #ffffff;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, .28);
+}
+.footer-emblem-circle img {
+  width: 100%;
+  height: 100%;
+  border-radius: 50%;
+  object-fit: contain;
+}
+.footer-emblem-tile {
+  display: grid;
+  height: 44px;
+  padding: 4px 8px;
+  place-items: center;
+  border: 1.5px solid rgba(56, 189, 248, .75);
+  border-radius: 11px;
+  background: #ffffff;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, .28);
+}
+.footer-emblem-tile img {
+  height: 34px;
+  width: auto;
+  object-fit: contain;
+}
+.footer-brand-titles {
+  min-width: 0;
+}
+.footer-brand-titles b {
+  display: block;
+  color: #ffffff;
+  font-family: 'IBM Plex Sans Thai', 'Noto Sans Thai', sans-serif;
+  font-size: 18px;
+  font-weight: 700;
+  line-height: 1.38;
+}
+.footer-brand-titles small {
+  display: block;
+  margin-top: 4px;
+  color: #fbbf24;
+  font-size: 11.5px;
+  font-weight: 700;
+  letter-spacing: .04em;
+  line-height: 1.45;
+}
+.footer-brand-desc {
+  margin: 0 0 18px;
+  color: rgba(255, 255, 255, .78);
+  font-size: 14px;
+  line-height: 1.8;
+}
+.footer-brand-site {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding-top: 15px;
+  border-top: 1px solid rgba(255, 255, 255, .12);
+  color: rgba(255, 255, 255, .88);
+  font-size: 13.5px;
+}
+.footer-gold-dot {
+  width: 9px;
+  height: 9px;
+  flex: none;
+  border-radius: 50%;
+  background: #f59e0b;
+  box-shadow: 0 0 0 3px rgba(245, 158, 11, .26);
+}
+.footer-brand-site a {
+  color: #fbbf24;
+  font-weight: 700;
+}
+.footer-brand-site a:hover {
+  color: #fde68a;
+  text-decoration: underline;
+}
+.footer-heading {
+  position: relative;
+  margin: 0 0 22px;
+  padding-bottom: 11px;
+  color: #ffffff;
+  font-size: 17.5px;
+  font-weight: 700;
+}
+.footer-heading::after {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 34px;
+  height: 3px;
+  border-radius: 999px;
+  background: #f59e0b;
+  content: '';
+}
+.footer-links {
+  display: grid;
+  gap: 11px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.footer-links li {
+  display: flex;
+  align-items: center;
+}
+.footer-links a {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  gap: 10px;
+  color: rgba(255, 255, 255, .82);
+  font-size: 14.5px;
+  line-height: 1.5;
+  transition: color .18s ease, transform .18s ease;
+}
+.footer-links a::before {
+  width: 5px;
+  height: 5px;
+  flex: none;
+  border-radius: 50%;
+  background: #f59e0b;
+  content: '';
+  opacity: .85;
+}
+.footer-links a:hover {
+  color: #fde68a;
+  transform: translateX(3px);
+}
+.footer-contact-list {
+  display: grid;
+  gap: 12px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+.footer-contact-list li {
+  display: flex;
+  align-items: flex-start;
+  gap: 11px;
+  color: rgba(255, 255, 255, .84);
+  font-size: 14px;
+  line-height: 1.65;
+}
+.footer-contact-icon {
+  display: inline-grid;
+  margin-top: 3px;
+  flex: none;
+  color: #fbbf24;
+}
+.footer-contact-list a {
+  color: #ffffff;
+}
+.footer-contact-list a:hover {
+  color: #fde68a;
+  text-decoration: underline;
+}
+.footer-contact-list b {
+  color: #ffffff;
+  font-weight: 700;
+}
+.footer-contact-note {
+  margin: 15px 0 0;
+  padding-top: 13px;
+  border-top: 1px solid rgba(255, 255, 255, .12);
+  color: rgba(255, 255, 255, .68);
+  font-size: 13px;
+  line-height: 1.7;
+}
+.footer-social-row {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  margin-top: 16px;
+}
+.footer-social-row a {
+  display: grid;
+  width: 36px;
+  height: 36px;
+  place-items: center;
+  border: 1px solid rgba(255, 255, 255, .18);
+  border-radius: 50%;
+  background: rgba(255, 255, 255, .06);
+  color: rgba(255, 255, 255, .88);
+  transition: transform .18s ease, border-color .18s ease, background-color .18s ease, color .18s ease;
+}
+.footer-social-row a:hover {
+  transform: translateY(-2px);
+  border-color: #fbbf24;
+  background: rgba(245, 158, 11, .2);
+  color: #fde68a;
+}
+.footer-bottom {
+  border-top: 1px solid rgba(255, 255, 255, .1);
+  background: rgba(2, 16, 22, .68);
+}
+.footer-bottom-inner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px 20px;
+  min-height: 54px;
+  padding-block: 12px;
+  color: rgba(255, 255, 255, .68);
+  font-size: 13px;
+}
+.footer-bottom-links {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+}
+.footer-bottom-links a {
+  color: rgba(255, 255, 255, .86);
+  font-weight: 600;
+}
+.footer-bottom-links a:hover {
+  color: #fde68a;
+}
+.footer-bottom-links span {
+  color: rgba(255, 255, 255, .28);
+}
+@media (max-width: 1040px) {
+  .footer-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 30px;
+  }
+}
+@media (max-width: 620px) {
+  .footer-grid {
+    grid-template-columns: minmax(0, 1fr);
+    gap: 26px;
+    padding: 36px 0 30px;
+  }
+  .footer-bottom-inner {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
+
 @media (max-width: 1100px) {
   .dash-kpi-grid, .dash-month-stats { grid-template-columns: repeat(2, minmax(0, 1fr)); }
 }
