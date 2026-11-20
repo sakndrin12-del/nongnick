@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useState } from 'react'
 import { Link, NavLink, Outlet, useLocation, useNavigate, useParams } from 'react-router-dom'
 import { api, assetUrl, parseMediaLink, useDocumentTitle } from '../services/api'
+import { LanguageSwitch, useLang } from '../i18n'
 
 function useAdminData(path, refresh = 0) {
   const [response, setResponse] = useState({ path: '', refresh: -1, data: null, error: '' })
@@ -764,22 +765,26 @@ export function CategoryManager() {
 }
 
 export default function AdminManagement({ admin, onLogout }) {
-  const displayName = admin?.fullname || 'เจ้าหน้าที่'
+  const { t } = useLang()
+  const displayName = admin?.fullname || t('เจ้าหน้าที่', 'Administrator')
   const avatarText = displayName.trim().slice(0, 1) || 'จ'
   return <main className="admin-page">
     <header className="admin-topbar admin-sidebar">
-      <Link className="admin-brand" to="/admin">
-        <span className="brand-logos" aria-hidden="true"><img className="brand-logo-seal" src="/logo-khonkaen.png" alt=""/><span className="brand-logo-divider"/><img className="brand-logo-ict" src="/logo-ict.png" alt=""/></span>
-        <span><b>คลังความรู้ ICT</b><small>พื้นที่เจ้าหน้าที่</small></span>
-      </Link>
+      <div className="admin-sidebar-top">
+        <Link className="admin-brand" to="/admin">
+          <span className="brand-logos" aria-hidden="true"><img className="brand-logo-seal" src="/logo-khonkaen.png" alt=""/><span className="brand-logo-divider"/><img className="brand-logo-ict" src="/logo-ict.png" alt=""/></span>
+          <span><b>{t('คลังความรู้ ICT', 'ICT Knowledge')}</b><small>{t('พื้นที่เจ้าหน้าที่', 'Staff Portal')}</small></span>
+        </Link>
+        <LanguageSwitch/>
+      </div>
       <div className="admin-nav-section">
-        <span className="admin-nav-label">เมนูจัดการระบบ</span>
-        <nav className="admin-nav" aria-label="เมนูพื้นที่เจ้าหน้าที่">
-          <NavLink to="/admin" end><span className="admin-nav-icon" aria-hidden="true">▤</span><span>ภาพรวม</span></NavLink>
-          <NavLink to="/admin/articles"><span className="admin-nav-icon" aria-hidden="true">✎</span><span>บทความ</span></NavLink>
-          <NavLink to="/admin/categories"><span className="admin-nav-icon" aria-hidden="true">▣</span><span>หมวดหมู่</span></NavLink>
-          <NavLink to="/admin/settings"><span className="admin-nav-icon" aria-hidden="true">⚙</span><span>ตั้งค่า</span></NavLink>
-          <Link to="/" target="_blank" className="admin-ext-link"><span className="admin-nav-icon" aria-hidden="true">↗</span><span>หน้าเว็บไซต์</span></Link>
+        <span className="admin-nav-label">{t('เมนูจัดการระบบ', 'MANAGEMENT MENU')}</span>
+        <nav className="admin-nav" aria-label={t('เมนูพื้นที่เจ้าหน้าที่', 'Staff navigation')}>
+          <NavLink to="/admin" end><span className="admin-nav-icon" aria-hidden="true">▤</span><span>{t('ภาพรวม', 'Dashboard')}</span></NavLink>
+          <NavLink to="/admin/articles"><span className="admin-nav-icon" aria-hidden="true">✎</span><span>{t('บทความ', 'Articles')}</span></NavLink>
+          <NavLink to="/admin/categories"><span className="admin-nav-icon" aria-hidden="true">▣</span><span>{t('หมวดหมู่', 'Categories')}</span></NavLink>
+          <NavLink to="/admin/settings"><span className="admin-nav-icon" aria-hidden="true">⚙</span><span>{t('ตั้งค่า', 'Settings')}</span></NavLink>
+          <Link to="/" target="_blank" className="admin-ext-link"><span className="admin-nav-icon" aria-hidden="true">↗</span><span>{t('หน้าเว็บไซต์', 'Public Website')}</span></Link>
         </nav>
       </div>
       <div className="admin-user-box">
@@ -787,10 +792,10 @@ export default function AdminManagement({ admin, onLogout }) {
           <span className="admin-avatar" aria-hidden="true">{avatarText}</span>
           <div>
             <b>{displayName}</b>
-            <small>เจ้าหน้าที่ดูแลระบบ</small>
+            <small>{t('เจ้าหน้าที่ดูแลระบบ', 'System Administrator')}</small>
           </div>
         </div>
-        <button type="button" onClick={onLogout}>ออกจากระบบ</button>
+        <button type="button" onClick={onLogout}>{t('ออกจากระบบ', 'Sign Out')}</button>
       </div>
     </header>
     <div className="admin-workspace">

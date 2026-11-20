@@ -1,9 +1,11 @@
 import { useEffect, useState } from 'react'
 import { Link, Navigate, useNavigate, useSearchParams } from 'react-router-dom'
 import { api, clearAdminToken, setAdminToken, useDocumentTitle } from '../services/api'
+import { LanguageSwitch, useLang } from '../i18n'
 import AdminManagement from './AdminManagement'
 
 export function AdminLoginPage() {
+  const { t } = useLang()
   const [mode, setMode] = useState('login')
   const [username, setUsername] = useState('')
   const [password, setPassword] = useState('')
@@ -127,10 +129,13 @@ export function AdminLoginPage() {
 
       <div className="admin-login-card">
         <div className="login-card-top">
-          <Link className="admin-brand" to="/"><span className="brand-logos" aria-hidden="true"><img className="brand-logo-seal" src="/logo-khonkaen.png" alt=""/><span className="brand-logo-divider"/><img className="brand-logo-ict" src="/logo-ict.png" alt=""/></span><span><b>คลังความรู้ ICT</b><small>ศูนย์พัฒนาทักษะและการเรียนรู้ ICT เทศบาลนครขอนแก่น</small></span></Link>
-          <div className="login-mode-tabs" role="tablist" aria-label="โหมดการเข้าใช้งาน">
-            <button type="button" role="tab" aria-selected={mode === 'login'} className={mode === 'login' ? 'active' : ''} onClick={() => { setMode('login'); setError('') }}>เข้าสู่ระบบ</button>
-            <button type="button" role="tab" aria-selected={mode === 'reset'} className={mode === 'reset' ? 'active' : ''} onClick={() => { setMode('reset'); setError(''); setNotice('') }}>ตั้งรหัสใหม่</button>
+          <Link className="admin-brand" to="/"><span className="brand-logos" aria-hidden="true"><img className="brand-logo-seal" src="/logo-khonkaen.png" alt=""/><span className="brand-logo-divider"/><img className="brand-logo-ict" src="/logo-ict.png" alt=""/></span><span><b>{t('คลังความรู้ ICT', 'ICT Knowledge Base')}</b><small>{t('ศูนย์พัฒนาทักษะและการเรียนรู้ ICT เทศบาลนครขอนแก่น', 'Khon Kaen Municipality ICT Learning Center')}</small></span></Link>
+          <div className="login-top-controls">
+            <LanguageSwitch className="is-light"/>
+            <div className="login-mode-tabs" role="tablist" aria-label={t('โหมดการเข้าใช้งาน', 'Authentication mode')}>
+              <button type="button" role="tab" aria-selected={mode === 'login'} className={mode === 'login' ? 'active' : ''} onClick={() => { setMode('login'); setError('') }}>{t('เข้าสู่ระบบ', 'Sign In')}</button>
+              <button type="button" role="tab" aria-selected={mode === 'reset'} className={mode === 'reset' ? 'active' : ''} onClick={() => { setMode('reset'); setError(''); setNotice('') }}>{t('ตั้งรหัสใหม่', 'Reset Password')}</button>
+            </div>
           </div>
         </div>
 
@@ -142,32 +147,32 @@ export function AdminLoginPage() {
               </span>
               <div>
                 <span className="eyebrow">STAFF AUTHENTICATION</span>
-                <h1>เข้าสู่ระบบเจ้าหน้าที่</h1>
+                <h1>{t('เข้าสู่ระบบเจ้าหน้าที่', 'Staff Sign In')}</h1>
               </div>
             </div>
-            <p>กรอกชื่อผู้ใช้และรหัสผ่านเพื่อเข้าสู่ระบบจัดการคลังความรู้</p>
+            <p>{t('กรอกชื่อผู้ใช้และรหัสผ่านเพื่อเข้าสู่ระบบจัดการคลังความรู้', 'Enter your staff username and password to access the Knowledge Base CMS.')}</p>
           </div>
           <form onSubmit={submit}>
-            <label htmlFor="username">ชื่อผู้ใช้ (Username)</label>
+            <label htmlFor="username">{t('ชื่อผู้ใช้ (Username)', 'Username')}</label>
             <div className="login-input-wrap">
               <span className="input-icon" aria-hidden="true">
                 <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M20 21v-2a4 4 0 0 0-4-4H8a4 4 0 0 0-4 4v2"/><circle cx="12" cy="7" r="4"/></svg>
               </span>
-              <input id="username" name="username" autoComplete="username" placeholder="กรอกชื่อผู้ใช้ของเจ้าหน้าที่" value={username} onChange={(event) => setUsername(event.target.value)} required maxLength={80}/>
+              <input id="username" name="username" autoComplete="username" placeholder={t('กรอกชื่อผู้ใช้ของเจ้าหน้าที่', 'Enter staff username')} value={username} onChange={(event) => setUsername(event.target.value)} required maxLength={80}/>
             </div>
 
-            <div className="password-label-row"><label htmlFor="password">รหัสผ่าน (Password)</label><button type="button" className="text-action-btn" onClick={() => setShowPass((v) => !v)}>{showPass ? 'ซ่อนรหัสผ่าน' : 'แสดงรหัสผ่าน'}</button></div>
+            <div className="password-label-row"><label htmlFor="password">{t('รหัสผ่าน (Password)', 'Password')}</label><button type="button" className="text-action-btn" onClick={() => setShowPass((v) => !v)}>{showPass ? t('ซ่อนรหัสผ่าน', 'Hide') : t('แสดงรหัสผ่าน', 'Show')}</button></div>
             <div className="login-input-wrap">
               <span className="input-icon" aria-hidden="true">
                 <svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
               </span>
-              <input id="password" name="password" type={showPass ? 'text' : 'password'} autoComplete="current-password" placeholder="กรอกรหัสผ่าน" value={password} onChange={(event) => setPassword(event.target.value)} required maxLength={200}/>
+              <input id="password" name="password" type={showPass ? 'text' : 'password'} autoComplete="current-password" placeholder={t('กรอกรหัสผ่าน', 'Enter password')} value={password} onChange={(event) => setPassword(event.target.value)} required maxLength={200}/>
             </div>
 
             {notice && <p role="status" className="admin-login-notice">✓ {notice}</p>}
-            {error ? <p role="alert" className="admin-login-error">{error}</p> : expired && <p role="status" className="admin-login-error">เซสชันหมดอายุ กรุณาเข้าสู่ระบบใหม่อีกครั้ง</p>}
-            <button className="login-submit-btn" disabled={busy}>{busy ? 'กำลังเข้าสู่ระบบ...' : 'เข้าสู่ระบบจัดการคลังความรู้ →'}</button>
-            <div className="login-helper-row"><button type="button" className="text-action-btn" onClick={() => { setMode('reset'); setError(''); setNotice('') }}>ลืมรหัสผ่าน หรือต้องการตั้งรหัสผ่านใหม่?</button></div>
+            {error ? <p role="alert" className="admin-login-error">{error}</p> : expired && <p role="status" className="admin-login-error">{t('เซสชันหมดอายุ กรุณาเข้าสู่ระบบใหม่อีกครั้ง', 'Session expired. Please sign in again.')}</p>}
+            <button className="login-submit-btn" disabled={busy}>{busy ? t('กำลังเข้าสู่ระบบ...', 'Signing in...') : t('เข้าสู่ระบบจัดการคลังความรู้ →', 'Sign In to Dashboard →')}</button>
+            <div className="login-helper-row"><button type="button" className="text-action-btn" onClick={() => { setMode('reset'); setError(''); setNotice('') }}>{t('ลืมรหัสผ่าน หรือต้องการตั้งรหัสผ่านใหม่?', 'Forgot password or need to reset?')}</button></div>
           </form>
         </> : <>
           <div className="admin-login-title">
