@@ -150,20 +150,67 @@ function NotFoundPage() { useDocumentTitle('ไม่พบหน้าที่
 
 function ArticlesPage({ search = false }) {
   const [params, setParams] = useSearchParams(); const query = params.get('q') || ''; const categoryId = params.get('category') || ''
+  const navigate = useNavigate()
   const categories = usePublicData('/categories')
   const selectedCategory = (categories.data || []).find((category) => String(category.categoryId) === categoryId)
   const page = Math.max(1, Number.parseInt(params.get('page'), 10) || 1)
   const searchParams = new URLSearchParams({ sort: params.get('sort') || 'recent', page: String(page), pageSize: '9' })
-  if (search && query) searchParams.set('q', query)
+  if (query) searchParams.set('q', query)
   if (categoryId) searchParams.set('category', categoryId)
   const path = `/articles/search?${searchParams.toString()}`
   const results = usePublicData(path)
   function updateFilter(key, value) { const next = new URLSearchParams(params); if (value) next.set(key, value); else next.delete(key); next.delete('page'); setParams(next) }
   function goToPage(value) { const next = new URLSearchParams(params); next.set('page', String(value)); setParams(next) }
+  function applySuggestion(term) {
+    const next = new URLSearchParams()
+    next.set('q', term)
+    if (params.get('sort')) next.set('sort', params.get('sort'))
+    navigate(`/search?${next.toString()}`)
+  }
+  const didYouMean = results.data?.didYouMean || null
+  const suggestions = results.data?.suggestions || []
+  const suggestedArticles = results.data?.suggestedArticles || []
   useDocumentTitle(search ? (query ? `ค้นหา “${query}”` : 'ค้นหาคู่มือ') : selectedCategory ? selectedCategory.categoryName : 'คลังความรู้และคู่มือ')
   return <main className="listing-page"><div className="shell"><div className="page-intro"><div className="breadcrumbs"><Link to="/">หน้าแรก</Link><span>/</span>{search ? 'ผลการค้นหา' : categoryId && selectedCategory ? <><Link to="/articles">คลังบทความ</Link><span>/</span><span>{selectedCategory.categoryName}</span></> : 'คลังบทความ'}</div><span className="eyebrow">ICT KNOWLEDGE LIBRARY</span><h1>{selectedCategory && !search ? selectedCategory.categoryName : search ? 'ผลการค้นหา' : 'คลังความรู้และคู่มือ'}</h1><p>{search ? (query ? <>ผลลัพธ์สำหรับ <b>“{query}”</b></> : 'พิมพ์คำค้นเพื่อค้นหาคู่มือ') : 'ค้นหาคู่มือและวิธีแก้ไขปัญหาด้านเทคโนโลยีสารสนเทศ'}</p><SearchBox key={query} initial={query}/></div>
     <div className="listing-layout"><aside className="filter-panel"><b>หมวดหมู่ความรู้</b><button className={!categoryId ? 'active' : ''} onClick={() => updateFilter('category', '')}>ทั้งหมด</button>{(categories.data || []).map((c) => <button key={c.categoryId} className={categoryId === String(c.categoryId) ? 'active' : ''} onClick={() => updateFilter('category', String(c.categoryId))}>{c.categoryName}</button>)}</aside>
-      <section className="listing-results"><div className="results-head"><span>{results.data?.total || 0} บทความ</span><select aria-label="เรียงลำดับ" value={params.get('sort') || 'recent'} onChange={(e) => updateFilter('sort', e.target.value)}><option value="recent">ใหม่ล่าสุด</option><option value="popular">ยอดเข้าชมสูงสุด</option></select></div>{results.loading ? <div className="loading">กำลังค้นหาบทความ...</div> : results.error ? <ErrorState message={results.error}/> : results.data?.items?.length ? <><div className="article-grid">{(results.data?.items || []).map((a) => <ArticleCard key={a.articleId} article={a}/>)}</div>{results.data.pageCount > 1 && <nav className="pagination" aria-label="เปลี่ยนหน้าผลการค้นหา"><button disabled={page <= 1} onClick={() => goToPage(page - 1)}>← ก่อนหน้า</button><span>หน้า {results.data.page} จาก {results.data.pageCount}</span><button disabled={page >= results.data.pageCount} onClick={() => goToPage(page + 1)}>ถัดไป →</button></nav>}</> : <EmptyState title="ไม่พบบทความที่ตรงกับคำค้น" detail="ลองใช้คำค้นอื่น หรือเลือกหมวดหมู่ความรู้"/>}</section></div>
+      <section className="listing-results"><div className="results-head"><span>{results.data?.total || 0} บทความ</span><select aria-label="เรียงลำดับ" value={params.get('sort') || 'recent'} onChange={(e) => updateFilter('sort', e.target.value)}><option value="recent">ใหม่ล่าสุด</option><option value="popular">ยอดเข้าชมสูงสุด</option></select></div>
+        {results.loading ? <div className="loading">กำลังค้นหาบทความ...</div> : results.error ? <ErrorState message={results.error}/> : results.data?.items?.length ? <>
+          {query && suggestions.length > 0 && <div className="search-assist-bar" role="region" aria-label="คำค้นใกล้เคียง">
+            <span>💡 คำค้นที่ใกล้เคียง:</span>
+            {suggestions.map((term) => <button type="button" key={term} className="suggestion-chip" onClick={() => applySuggestion(term)}>{term}</button>)}
+          </div>}
+          <div className="article-grid">{(results.data?.items || []).map((a) => <ArticleCard key={a.articleId} article={a}/>)}</div>
+          {results.data.pageCount > 1 && <nav className="pagination" aria-label="เปลี่ยนหน้าผลการค้นหา"><button disabled={page <= 1} onClick={() => goToPage(page - 1)}>← ก่อนหน้า</button><span>หน้า {results.data.page} จาก {results.data.pageCount}</span><button disabled={page >= results.data.pageCount} onClick={() => goToPage(page + 1)}>ถัดไป →</button></nav>}
+        </> : <>
+          <div className="empty-state search-empty-box">
+            <span>⌕</span>
+            <b>{query ? `ไม่พบบทความที่ตรงกับคำว่า “${query}”` : 'ไม่พบบทความในหมวดหมู่นี้'}</b>
+            <p>อาจเกิดจากการสะกดคำผิด ลืมเปลี่ยนภาษาแป้นพิมพ์ หรือใช้คำเฉพาะ — ลองเลือกคำค้นใกล้เคียงด้านล่างได้เลยครับ</p>
+            {didYouMean && <div className="did-you-mean-row">
+              <span>💡 คุณหมายถึงคำนี้หรือไม่:</span>
+              <button type="button" className="did-you-mean-btn" onClick={() => applySuggestion(didYouMean)}>⌕ ค้นหาคำว่า “{didYouMean}”</button>
+            </div>}
+            {suggestions.length > 0 && <div className="suggestions-block">
+              <small>คำค้นใกล้เคียงที่มีคู่มือในระบบ:</small>
+              <div className="suggestion-chip-list">
+                {suggestions.map((term) => <button type="button" key={term} className="suggestion-chip" onClick={() => applySuggestion(term)}>{term}</button>)}
+              </div>
+            </div>}
+            {categoryId && <button type="button" className="clear-category-btn" onClick={() => updateFilter('category', '')}>ดูบทความจากทุกหมวดหมู่ →</button>}
+          </div>
+          {suggestedArticles.length > 0 && <div className="suggested-articles-section">
+            <div className="section-heading">
+              <div>
+                <span className="eyebrow">RECOMMENDED GUIDES</span>
+                <h2>คู่มือที่ใกล้เคียงกับคำค้นของคุณ</h2>
+              </div>
+            </div>
+            <div className="article-grid">
+              {suggestedArticles.map((a) => <ArticleCard key={a.articleId} article={a}/>)}
+            </div>
+          </div>}
+        </>}
+      </section></div>
   </div></main>
 }
 
