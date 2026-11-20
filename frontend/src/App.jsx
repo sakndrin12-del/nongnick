@@ -1,34 +1,38 @@
 import { useEffect, useState } from 'react'
 import { Link, NavLink, Outlet, Route, Routes, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { api, assetUrl, feedbackKey, parseMediaLink, useDocumentTitle } from './services/api'
+import { LanguageProvider, LanguageSwitch, useLang } from './i18n'
 import { AdminLoginPage, AdminPage } from './pages/Admin'
 import { AdminHome, ArticleEditor, ArticleList, CategoryManager, ContactSettings } from './pages/AdminManagement'
 import './App.css'
 
 const categoryIcons = ['▣', '⌁', '▤', '▧', '◉']
-const dateLabel = (value) => value ? new Intl.DateTimeFormat('th-TH', { dateStyle: 'medium' }).format(new Date(value)) : 'ยังไม่เผยแพร่'
 const excerpt = (value = '') => {
-  const text = value.replace(/<[^>]*>/g, '').replace(/^\s*เกริ่นนำ\s*[:：]?\s*/, '').replace(/\s+/g, ' ').trim()
-  if (text.length <= 120) return text
-  const shortened = text.slice(0, 120)
+  const text = value.replace(/<[^>]*>/g, '').replace(/^\s*(?:เกริ่นนำ|Introduction)\s*[:：]?\s*/i, '').replace(/\s+/g, ' ').trim()
+  if (text.length <= 125) return text
+  const shortened = text.slice(0, 125)
   const lastSpace = shortened.lastIndexOf(' ')
   return `${(lastSpace > 0 ? shortened.slice(0, lastSpace) : shortened).trimEnd()}…`
 }
 
 function Header() {
+  const { t } = useLang()
   let isAdmin = false
   try { isAdmin = Boolean(window.sessionStorage.getItem('ict-admin-token')) } catch { /* Storage can be disabled by browser policy. */ }
   return <>
-    <div className="utility"><div className="shell utility-inner"><span className="utility-org"><img className="utility-seal" src="/logo-khonkaen.png" alt="ตราเทศบาลนครขอนแก่น"/><span>ศูนย์พัฒนาทักษะและการเรียนรู้ ICT เทศบาลนครขอนแก่น (KKICT)</span></span><span>บริการคลังความรู้ดิจิทัล · <a href="https://www.kkict.net/" target="_blank" rel="noreferrer">เว็บไซต์หลัก kkict.net ↗</a></span></div></div>
+    <div className="utility"><div className="shell utility-inner"><span className="utility-org"><img className="utility-seal" src="/logo-khonkaen.png" alt="ตราเทศบาลนครขอนแก่น"/><span>{t('ศูนย์พัฒนาทักษะและการเรียนรู้ ICT เทศบาลนครขอนแก่น (KKICT)', 'Khon Kaen Municipality ICT Skill Development & Learning Center (KKICT)')}</span></span><span>{t('บริการคลังความรู้ดิจิทัล', 'Digital Knowledge Portal')} · <a href="https://www.kkict.net/" target="_blank" rel="noreferrer">{t('เว็บไซต์หลัก kkict.net ↗', 'Main Website kkict.net ↗')}</a></span></div></div>
     <header className="site-header"><div className="shell nav-row">
-      <Link className="brand" to="/"><span className="brand-logos" aria-hidden="true"><img className="brand-logo-seal" src="/logo-khonkaen.png" alt=""/><span className="brand-logo-divider"/><img className="brand-logo-ict" src="/logo-ict.png" alt=""/></span><span><b>คลังความรู้ ICT</b><small>ศูนย์พัฒนาทักษะและการเรียนรู้ ICT เทศบาลนครขอนแก่น</small></span></Link>
-      <nav><NavLink to="/" end>หน้าแรก</NavLink><NavLink to="/articles">คลังความรู้</NavLink></nav>
-      <Link className="nav-staff-btn" to={isAdmin ? '/admin' : '/admin/login'}>
-        <span className="nav-staff-icon" aria-hidden="true">
-          <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
-        </span>
-        <span>{isAdmin ? 'ไปที่ระบบจัดการ' : 'เข้าสู่ระบบเจ้าหน้าที่'}</span>
-      </Link>
+      <Link className="brand" to="/"><span className="brand-logos" aria-hidden="true"><img className="brand-logo-seal" src="/logo-khonkaen.png" alt=""/><span className="brand-logo-divider"/><img className="brand-logo-ict" src="/logo-ict.png" alt=""/></span><span><b>{t('คลังความรู้ ICT', 'ICT Knowledge Base')}</b><small>{t('ศูนย์พัฒนาทักษะและการเรียนรู้ ICT เทศบาลนครขอนแก่น', 'Khon Kaen Municipality ICT Learning Center')}</small></span></Link>
+      <nav><NavLink to="/" end>{t('หน้าแรก', 'Home')}</NavLink><NavLink to="/articles">{t('คลังความรู้', 'Knowledge Library')}</NavLink></nav>
+      <div className="nav-actions">
+        <LanguageSwitch/>
+        <Link className="nav-staff-btn" to={isAdmin ? '/admin' : '/admin/login'}>
+          <span className="nav-staff-icon" aria-hidden="true">
+            <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round"><rect x="3" y="11" width="18" height="11" rx="2" ry="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+          </span>
+          <span>{isAdmin ? t('ไปที่ระบบจัดการ', 'Admin Dashboard') : t('เข้าสู่ระบบเจ้าหน้าที่', 'Staff Login')}</span>
+        </Link>
+      </div>
     </div></header>
   </>
 }
@@ -58,7 +62,10 @@ function contactActionHref(contact) {
   return safePhoneHref(contact?.phone) || safeHttpsHref(contact?.lineUrl) || safeEmailHref(contact?.email)
 }
 
-function ContactCard({ contact, title = 'ช่องทางติดต่อ', className = '' }) {
+function ContactCard({ contact: rawContact, title, className = '' }) {
+  const { t, translateContact } = useLang()
+  const contact = translateContact(rawContact)
+  const heading = title || t('ช่องทางติดต่อ', 'Contact Channels')
   const phone = typeof contact?.phone === 'string' ? contact.phone.trim() : ''
   const lineId = typeof contact?.lineId === 'string' ? contact.lineId.trim() : ''
   const lineUrl = safeHttpsHref(contact?.lineUrl)
@@ -69,30 +76,39 @@ function ContactCard({ contact, title = 'ช่องทางติดต่อ
   if (![phone, lineId, lineUrl, email, location, hours, note].some(Boolean)) return null
   const phoneHref = safePhoneHref(phone)
   const emailHref = safeEmailHref(email)
-  return <section className={`contact-card ${className}`.trim()} aria-label={title}>
-    <h2>{title}</h2>
+  return <section className={`contact-card ${className}`.trim()} aria-label={heading}>
+    <h2>{heading}</h2>
     <dl className="contact-details">
-      {phone && <div><dt>โทรศัพท์</dt><dd>{phoneHref ? <a href={phoneHref}>{phone}</a> : phone}</dd></div>}
-      {(lineId || lineUrl) && <div><dt>LINE</dt><dd>{lineUrl ? <a href={lineUrl} target="_blank" rel="noreferrer">{lineId || 'เปิด LINE'}</a> : lineId}</dd></div>}
-      {email && <div><dt>อีเมล</dt><dd>{emailHref ? <a href={emailHref}>{email}</a> : email}</dd></div>}
-      {location && <div><dt>ที่ตั้ง</dt><dd>{location}</dd></div>}
-      {hours && <div><dt>เวลาทำการ</dt><dd>{hours}</dd></div>}
+      {phone && <div><dt>{t('โทรศัพท์', 'Phone')}</dt><dd>{phoneHref ? <a href={phoneHref}>{phone}</a> : phone}</dd></div>}
+      {(lineId || lineUrl) && <div><dt>LINE</dt><dd>{lineUrl ? <a href={lineUrl} target="_blank" rel="noreferrer">{lineId || t('เปิด LINE', 'Open LINE')}</a> : lineId}</dd></div>}
+      {email && <div><dt>{t('อีเมล', 'Email')}</dt><dd>{emailHref ? <a href={emailHref}>{email}</a> : email}</dd></div>}
+      {location && <div><dt>{t('ที่ตั้ง', 'Location')}</dt><dd>{location}</dd></div>}
+      {hours && <div><dt>{t('เวลาทำการ', 'Service Hours')}</dt><dd>{hours}</dd></div>}
     </dl>
     {note && <p className="contact-note">{note}</p>}
   </section>
 }
 
 function Footer() {
+  const { t } = useLang()
   const contact = usePublicData('/settings/contact')
-  return <footer><div className="shell footer-row"><div className="footer-brand-col"><div className="footer-logos"><img className="footer-logo-seal" src="/logo-khonkaen.png" alt="ตราเทศบาลนครขอนแก่น"/><span className="brand-logo-divider"/><img className="footer-logo-ict" src="/logo-ict.png" alt="ศูนย์พัฒนาทักษะและการเรียนรู้ ICT เทศบาลนครขอนแก่น"/></div><b>คลังความรู้และคู่มือบริการไอที (KKICT)</b><p>ศูนย์พัฒนาทักษะและการเรียนรู้ ICT เทศบาลนครขอนแก่น · แหล่งรวมคู่มือและวิธีแก้ไขปัญหาด้านเทคโนโลยีสารสนเทศสำหรับบุคลากรและประชาชน</p><span>ศูนย์ ICT ขอนแก่น · <a href="https://www.kkict.net/" target="_blank" rel="noreferrer">www.kkict.net ↗</a></span></div><ContactCard contact={contact.data} title="ติดต่อศูนย์ ICT" className="footer-contact-card"/></div></footer>
+  return <footer><div className="shell footer-row"><div className="footer-brand-col"><div className="footer-logos"><img className="footer-logo-seal" src="/logo-khonkaen.png" alt="ตราเทศบาลนครขอนแก่น"/><span className="brand-logo-divider"/><img className="footer-logo-ict" src="/logo-ict.png" alt="ศูนย์พัฒนาทักษะและการเรียนรู้ ICT เทศบาลนครขอนแก่น"/></div><b>{t('คลังความรู้และคู่มือบริการไอที (KKICT)', 'IT Knowledge Base & Service Guides (KKICT)')}</b><p>{t('ศูนย์พัฒนาทักษะและการเรียนรู้ ICT เทศบาลนครขอนแก่น · แหล่งรวมคู่มือและวิธีแก้ไขปัญหาด้านเทคโนโลยีสารสนเทศสำหรับบุคลากรและประชาชน', 'Khon Kaen Municipality ICT Learning Center · Comprehensive IT manuals and self-service troubleshooting guides for staff and citizens.')}</p><span>{t('ศูนย์ ICT ขอนแก่น', 'Khon Kaen ICT Center')} · <a href="https://www.kkict.net/" target="_blank" rel="noreferrer">www.kkict.net ↗</a></span></div><ContactCard contact={contact.data} title={t('ติดต่อศูนย์ ICT', 'Contact ICT Center')} className="footer-contact-card"/></div></footer>
 }
 
 function SearchBox({ initial = '' }) {
+  const { t, translateKeyword } = useLang()
   const [value, setValue] = useState(initial)
   const navigate = useNavigate()
+  const popularTerms = [
+    ['Wi-Fi', 'Wi-Fi'],
+    ['Printer', 'Printer'],
+    ['รหัสผ่าน', translateKeyword('รหัสผ่าน')],
+    ['Windows', 'Windows'],
+    ['อินเทอร์เน็ต', translateKeyword('อินเทอร์เน็ต')],
+  ]
   return <><form className="hero-search" onSubmit={(e) => { e.preventDefault(); navigate(`/search?q=${encodeURIComponent(value.trim())}`) }}>
-    <span>⌕</span><input value={value} onChange={(e) => setValue(e.target.value)} aria-label="พิมพ์คำค้น" placeholder="พิมพ์สิ่งที่ต้องการค้นหา เช่น เชื่อมต่อ Wi-Fi..."/><button type="submit">ค้นหาคู่มือ</button>
-  </form><div className="popular-searches"><span>คำค้นหายอดนิยม</span>{['Wi-Fi', 'Printer', 'รหัสผ่าน', 'Windows', 'อินเทอร์เน็ต'].map((term) => <button type="button" key={term} onClick={() => navigate(`/search?q=${encodeURIComponent(term)}`)}>{term}</button>)}</div></>
+    <span>⌕</span><input value={value} onChange={(e) => setValue(e.target.value)} aria-label={t('พิมพ์คำค้น', 'Search guides')} placeholder={t('พิมพ์สิ่งที่ต้องการค้นหา เช่น เชื่อมต่อ Wi-Fi...', 'Search IT guides, e.g. Wi-Fi, Printer, Password...')}/><button type="submit">{t('ค้นหาคู่มือ', 'Search Guides')}</button>
+  </form><div className="popular-searches"><span>{t('คำค้นหายอดนิยม', 'Popular Searches')}</span>{popularTerms.map(([rawTerm, label]) => <button type="button" key={rawTerm} onClick={() => navigate(`/search?q=${encodeURIComponent(rawTerm)}`)}>{label}</button>)}</div></>
 }
 
 function usePublicData(path) {
@@ -108,26 +124,34 @@ function usePublicData(path) {
 }
 
 function CategoryGrid({ categories = [] }) {
-  return <div className="category-grid">{(categories || []).map((category, index) => <Link to={`/articles?category=${category.categoryId}`} className="category-card" key={category.categoryId}>
-    <span className={`category-icon color-${index % 5}`}>{categoryIcons[index % categoryIcons.length]}</span><span><b>{category.categoryName}</b><small>{category._count?.articles ?? 0} บทความ</small></span><span className="arrow">→</span>
-  </Link>)}</div>
+  const { t, translateCategory } = useLang()
+  return <div className="category-grid">{(categories || []).map((rawCategory, index) => {
+    const category = translateCategory(rawCategory)
+    const count = category._count?.articles ?? 0
+    return <Link to={`/articles?category=${category.categoryId}`} className="category-card" key={category.categoryId}>
+      <span className={`category-icon color-${index % 5}`}>{categoryIcons[index % categoryIcons.length]}</span><span><b>{category.categoryName}</b><small>{count} {t('บทความ', count === 1 ? 'guide' : 'guides')}</small></span><span className="arrow">→</span>
+    </Link>
+  })}</div>
 }
 
-function ArticleCard({ article }) {
+function ArticleCard({ article: rawArticle }) {
+  const { t, formatDate, translateArticle } = useLang()
+  const article = translateArticle(rawArticle)
   const imageCount = Array.isArray(article.images) && article.images.length ? article.images.length : (article.image ? 1 : 0)
-  return <article className="article-card"><Link className="article-art" to={`/articles/${article.articleId}`} aria-label={`อ่าน ${article.title}`}>
-    {article.image ? <img src={assetUrl(article.image)} alt=""/> : <div className="art-placeholder"><span>{article.category?.categoryName || 'คู่มือ ICT'}</span><b>{article.title.slice(0, 1)}</b><i>ICT KNOWLEDGE</i></div>}
-    {article.featured && <span className="featured-tag">แนะนำ</span>}
-    {imageCount > 1 && <span className="image-count-tag">🖼 {imageCount} รูป</span>}
-    {article.videoUrl && <span className="video-tag">▶ วิดีโอ/ลิงก์</span>}
-  </Link><div className="article-copy"><div className="article-meta"><span>{article.category?.categoryName || 'ความรู้ทั่วไป'}</span><span>{dateLabel(article.publishedAt || article.createdAt)}</span></div>
-    <h3><Link to={`/articles/${article.articleId}`}>{article.title}</Link></h3><p>{excerpt(article.content)}</p><div className="article-bottom"><span>◷ {article.viewCount.toLocaleString('th-TH')} ครั้ง</span><Link to={`/articles/${article.articleId}`}>อ่านเพิ่มเติม <b>→</b></Link></div>
+  return <article className="article-card"><Link className="article-art" to={`/articles/${article.articleId}`} aria-label={`${t('อ่าน', 'Read')} ${article.title}`}>
+    {article.image ? <img src={assetUrl(article.image)} alt=""/> : <div className="art-placeholder"><span>{article.category?.categoryName || t('คู่มือ ICT', 'ICT Guide')}</span><b>{article.title.slice(0, 1)}</b><i>ICT KNOWLEDGE</i></div>}
+    {article.featured && <span className="featured-tag">{t('แนะนำ', 'Featured')}</span>}
+    {imageCount > 1 && <span className="image-count-tag">🖼 {imageCount} {t('รูป', 'pics')}</span>}
+    {article.videoUrl && <span className="video-tag">▶ {t('วิดีโอ/ลิงก์', 'Video/Link')}</span>}
+  </Link><div className="article-copy"><div className="article-meta"><span>{article.category?.categoryName || t('ความรู้ทั่วไป', 'General Guide')}</span><span>{formatDate(article.publishedAt || article.createdAt)}</span></div>
+    <h3><Link to={`/articles/${article.articleId}`}>{article.title}</Link></h3><p>{excerpt(article.content)}</p><div className="article-bottom"><span>◷ {article.viewCount.toLocaleString('th-TH')} {t('ครั้ง', 'views')}</span><Link to={`/articles/${article.articleId}`}>{t('อ่านเพิ่มเติม', 'Read Guide')} <b>→</b></Link></div>
   </div></article>
 }
 
 function SectionHeading({ eyebrow, title, action, to }) { return <div className="section-heading"><div><span className="eyebrow">{eyebrow}</span><h2>{title}</h2></div>{action && <Link className="text-link" to={to}>{action} <b>→</b></Link>}</div> }
 
 function HomePage() {
+  const { t } = useLang()
   const categories = usePublicData('/categories')
   const recent = usePublicData('/articles?limit=6')
   const featured = usePublicData('/articles?featured=true&limit=3')
@@ -135,24 +159,33 @@ function HomePage() {
   const contactHref = contactActionHref(contact.data)
   useDocumentTitle('')
   return <main>
-    <section className="hero"><div className="shell hero-inner"><div className="hero-copy"><div className="hero-kicker"><img className="kicker-seal" src="/logo-khonkaen.png" alt=""/><img className="kicker-ict" src="/logo-ict.png" alt=""/><span>ศูนย์พัฒนาทักษะและการเรียนรู้ ICT เทศบาลนครขอนแก่น</span></div><h1>คลังความรู้และคู่มือไอที<br/>เพื่อการเรียนรู้และแก้ไขปัญหาด้วยตนเอง</h1><p>บริการข้อมูลคู่มือการใช้งานคอมพิวเตอร์ เครือข่าย อุปกรณ์สำนักงาน และระบบสารสนเทศ ค้นหาคำตอบได้สะดวกพร้อมขั้นตอนปฏิบัติอย่างเป็นลำดับ</p><SearchBox/><div className="hero-proof"><span>✓</span> มาตรฐานคู่มือเข้าใจง่าย <span>✓</span> ค้นหาได้ตลอด 24 ชั่วโมง <span>✓</span> บริการสาธารณะไม่มีค่าใช้จ่าย</div></div><div className="hero-visual" aria-hidden="true"><div className="visual-circle"><div className="visual-window"><div className="window-bar"><i/><i/><i/><b>KKICT SERVICE PORTAL</b></div><div className="window-content window-logo-content"><img className="window-logo-seal" src="/logo-khonkaen.png" alt=""/><img className="window-logo-ict" src="/logo-ict.png" alt=""/><div className="window-check">✓</div></div></div><span className="float-chip chip-one">✓ ขั้นตอนชัดเจน ทำตามได้จริง</span><span className="float-chip chip-two">⌕ ค้นหาคู่มือมาตรฐาน</span><span className="visual-dot dot-one"/><span className="visual-dot dot-two"/></div></div></div></section>
-    <section className="section shell categories-section"><SectionHeading eyebrow="BROWSE BY TOPIC" title="เลือกหมวดหมู่ความรู้" action="ดูทุกหมวดหมู่" to="/articles"/>{categories.loading ? <div className="loading">กำลังโหลดหมวดหมู่...</div> : categories.error ? <ErrorState message={categories.error}/> : categories.data?.length ? <CategoryGrid categories={categories.data}/> : <EmptyState title="ยังไม่มีหมวดหมู่" detail="หมวดหมู่ความรู้จะแสดงที่นี่เมื่อมีการเพิ่มข้อมูล"/>}</section>
-    <section className="section latest-section"><div className="shell"><SectionHeading eyebrow="LATEST KNOWLEDGE" title="คู่มือและบทความล่าสุด" action="ดูบทความทั้งหมด" to="/articles"/>{recent.loading ? <div className="loading">กำลังโหลดบทความ...</div> : recent.error ? <ErrorState message={recent.error}/> : recent.data?.length ? <div className="article-grid">{(recent.data || []).map((a) => <ArticleCard key={a.articleId} article={a}/>)}</div> : <EmptyState title="ยังไม่มีบทความ" detail="เมื่อมีการเผยแพร่คู่มือ บทความจะแสดงที่นี่"/>}</div></section>
-    {!!featured.data?.length && <section className="section shell"><SectionHeading eyebrow="EDITOR'S PICKS" title="บทความแนะนำ"/><div className="article-grid">{(featured.data || []).map((a) => <ArticleCard key={a.articleId} article={a}/>)}</div></section>}
-    <section className="help-banner shell"><div className="help-mark">i</div><div><b>ยังหาคำตอบที่ต้องการไม่เจอ?</b><p>ลองค้นหาด้วยคำอื่น หรือเลือกดูจากหมวดหมู่ด้านบน</p></div><Link to="/articles">ดูคลังความรู้ <span>→</span></Link>{contactHref && <a className="help-contact-link" href={contactHref}>ติดต่อเจ้าหน้าที่</a>}</section>
+    <section className="hero"><div className="shell hero-inner"><div className="hero-copy"><div className="hero-kicker"><img className="kicker-seal" src="/logo-khonkaen.png" alt=""/><img className="kicker-ict" src="/logo-ict.png" alt=""/><span>{t('ศูนย์พัฒนาทักษะและการเรียนรู้ ICT เทศบาลนครขอนแก่น', 'Khon Kaen Municipality ICT Learning Center')}</span></div><h1>{t('คลังความรู้และคู่มือไอที', 'IT Knowledge Base & Manuals')}<br/>{t('เพื่อการเรียนรู้และแก้ไขปัญหาด้วยตนเอง', 'for Self-Service Learning & Troubleshooting')}</h1><p>{t('บริการข้อมูลคู่มือการใช้งานคอมพิวเตอร์ เครือข่าย อุปกรณ์สำนักงาน และระบบสารสนเทศ ค้นหาคำตอบได้สะดวกพร้อมขั้นตอนปฏิบัติอย่างเป็นลำดับ', 'Explore step-by-step manuals for computers, wireless networks, office equipment, and municipal information systems — easy to follow anytime.')}</p><SearchBox/><div className="hero-proof"><span>✓</span> {t('มาตรฐานคู่มือเข้าใจง่าย', 'Clear Step-by-Step Guides')} <span>✓</span> {t('ค้นหาได้ตลอด 24 ชั่วโมง', 'Available 24/7 Online')} <span>✓</span> {t('บริการสาธารณะไม่มีค่าใช้จ่าย', 'Free Public Service')}</div></div><div className="hero-visual" aria-hidden="true"><div className="visual-circle"><div className="visual-window"><div className="window-bar"><i/><i/><i/><b>KKICT SERVICE PORTAL</b></div><div className="window-content window-logo-content"><img className="window-logo-seal" src="/logo-khonkaen.png" alt=""/><img className="window-logo-ict" src="/logo-ict.png" alt=""/><div className="window-check">✓</div></div></div><span className="float-chip chip-one">✓ {t('ขั้นตอนชัดเจน ทำตามได้จริง', 'Practical Step-by-Step')}</span><span className="float-chip chip-two">⌕ {t('ค้นหาคู่มือมาตรฐาน', 'Verified IT Manuals')}</span><span className="visual-dot dot-one"/><span className="visual-dot dot-two"/></div></div></div></section>
+    <section className="section shell categories-section"><SectionHeading eyebrow="BROWSE BY TOPIC" title={t('เลือกหมวดหมู่ความรู้', 'Browse by Category')} action={t('ดูทุกหมวดหมู่', 'View All Categories')} to="/articles"/>{categories.loading ? <div className="loading">{t('กำลังโหลดหมวดหมู่...', 'Loading categories...')}</div> : categories.error ? <ErrorState message={categories.error}/> : categories.data?.length ? <CategoryGrid categories={categories.data}/> : <EmptyState title={t('ยังไม่มีหมวดหมู่', 'No Categories Yet')} detail={t('หมวดหมู่ความรู้จะแสดงที่นี่เมื่อมีการเพิ่มข้อมูล', 'Knowledge categories will appear here once added.')}/>}</section>
+    <section className="section latest-section"><div className="shell"><SectionHeading eyebrow="LATEST KNOWLEDGE" title={t('คู่มือและบทความล่าสุด', 'Latest Guides & Articles')} action={t('ดูบทความทั้งหมด', 'View All Guides')} to="/articles"/>{recent.loading ? <div className="loading">{t('กำลังโหลดบทความ...', 'Loading articles...')}</div> : recent.error ? <ErrorState message={recent.error}/> : recent.data?.length ? <div className="article-grid">{(recent.data || []).map((a) => <ArticleCard key={a.articleId} article={a}/>)}</div> : <EmptyState title={t('ยังไม่มีบทความ', 'No Articles Yet')} detail={t('เมื่อมีการเผยแพร่คู่มือ บทความจะแสดงที่นี่', 'Published guides will appear here.')}/>}</div></section>
+    {!!featured.data?.length && <section className="section shell"><SectionHeading eyebrow="EDITOR'S PICKS" title={t('บทความแนะนำ', 'Featured Guides')}/><div className="article-grid">{(featured.data || []).map((a) => <ArticleCard key={a.articleId} article={a}/>)}</div></section>}
+    <section className="help-banner shell"><div className="help-mark">i</div><div><b>{t('ยังหาคำตอบที่ต้องการไม่เจอ?', 'Still looking for the right answer?')}</b><p>{t('ลองค้นหาด้วยคำอื่น หรือเลือกดูจากหมวดหมู่ด้านบน', 'Try searching with another keyword or browse our categories above.')}</p></div><Link to="/articles">{t('ดูคลังความรู้', 'Browse Library')} <span>→</span></Link>{contactHref && <a className="help-contact-link" href={contactHref}>{t('ติดต่อเจ้าหน้าที่', 'Contact ICT Staff')}</a>}</section>
   </main>
 }
 
-function ErrorState({ message }) { return <div className="notice error-notice"><b>ไม่สามารถเชื่อมต่อข้อมูลได้</b><span>{message} โปรดลองใหม่เมื่อตรวจสอบการเชื่อมต่อระบบแล้ว</span></div> }
+function ErrorState({ message }) {
+  const { t } = useLang()
+  return <div className="notice error-notice"><b>{t('ไม่สามารถเชื่อมต่อข้อมูลได้', 'Unable to Load Data')}</b><span>{message} {t('โปรดลองใหม่เมื่อตรวจสอบการเชื่อมต่อระบบแล้ว', 'Please check your connection and try again.')}</span></div>
+}
 function EmptyState({ title, detail }) { return <div className="empty-state"><span>⌕</span><b>{title}</b><p>{detail}</p></div> }
 
-function NotFoundPage() { useDocumentTitle('ไม่พบหน้าที่ต้องการ'); return <main className="not-found shell"><span className="eyebrow">404 · PAGE NOT FOUND</span><h1>ไม่พบหน้าที่คุณกำลังหา</h1><p>ลิงก์นี้อาจถูกย้ายหรือไม่มีอยู่แล้ว</p><Link className="admin-primary-link" to="/">กลับหน้าแรก</Link></main> }
+function NotFoundPage() {
+  const { t } = useLang()
+  useDocumentTitle(t('ไม่พบหน้าที่ต้องการ', 'Page Not Found'))
+  return <main className="not-found shell"><span className="eyebrow">404 · PAGE NOT FOUND</span><h1>{t('ไม่พบหน้าที่คุณกำลังหา', 'Page Not Found')}</h1><p>{t('ลิงก์นี้อาจถูกย้ายหรือไม่มีอยู่แล้ว', 'The link you followed may have been moved or no longer exists.')}</p><Link className="admin-primary-link" to="/">{t('กลับหน้าแรก', 'Back to Home')}</Link></main>
+}
 
 function ArticlesPage({ search = false }) {
+  const { t, translateCategory, translateKeyword } = useLang()
   const [params, setParams] = useSearchParams(); const query = params.get('q') || ''; const categoryId = params.get('category') || ''
   const navigate = useNavigate()
   const categories = usePublicData('/categories')
-  const selectedCategory = (categories.data || []).find((category) => String(category.categoryId) === categoryId)
+  const rawSelectedCategory = (categories.data || []).find((category) => String(category.categoryId) === categoryId)
+  const selectedCategory = translateCategory(rawSelectedCategory)
   const page = Math.max(1, Number.parseInt(params.get('page'), 10) || 1)
   const searchParams = new URLSearchParams({ sort: params.get('sort') || 'recent', page: String(page), pageSize: '9' })
   if (query) searchParams.set('q', query)
@@ -170,39 +203,39 @@ function ArticlesPage({ search = false }) {
   const didYouMean = results.data?.didYouMean || null
   const suggestions = results.data?.suggestions || []
   const suggestedArticles = results.data?.suggestedArticles || []
-  useDocumentTitle(search ? (query ? `ค้นหา “${query}”` : 'ค้นหาคู่มือ') : selectedCategory ? selectedCategory.categoryName : 'คลังความรู้และคู่มือ')
-  return <main className="listing-page"><div className="shell"><div className="page-intro"><div className="breadcrumbs"><Link to="/">หน้าแรก</Link><span>/</span>{search ? 'ผลการค้นหา' : categoryId && selectedCategory ? <><Link to="/articles">คลังบทความ</Link><span>/</span><span>{selectedCategory.categoryName}</span></> : 'คลังบทความ'}</div><span className="eyebrow">ICT KNOWLEDGE LIBRARY</span><h1>{selectedCategory && !search ? selectedCategory.categoryName : search ? 'ผลการค้นหา' : 'คลังความรู้และคู่มือ'}</h1><p>{search ? (query ? <>ผลลัพธ์สำหรับ <b>“{query}”</b></> : 'พิมพ์คำค้นเพื่อค้นหาคู่มือ') : 'ค้นหาคู่มือและวิธีแก้ไขปัญหาด้านเทคโนโลยีสารสนเทศ'}</p><SearchBox key={query} initial={query}/></div>
-    <div className="listing-layout"><aside className="filter-panel"><b>หมวดหมู่ความรู้</b><button className={!categoryId ? 'active' : ''} onClick={() => updateFilter('category', '')}>ทั้งหมด</button>{(categories.data || []).map((c) => <button key={c.categoryId} className={categoryId === String(c.categoryId) ? 'active' : ''} onClick={() => updateFilter('category', String(c.categoryId))}>{c.categoryName}</button>)}</aside>
-      <section className="listing-results"><div className="results-head"><span>{results.data?.total || 0} บทความ</span><select aria-label="เรียงลำดับ" value={params.get('sort') || 'recent'} onChange={(e) => updateFilter('sort', e.target.value)}><option value="recent">ใหม่ล่าสุด</option><option value="popular">ยอดเข้าชมสูงสุด</option></select></div>
-        {results.loading ? <div className="loading">กำลังค้นหาบทความ...</div> : results.error ? <ErrorState message={results.error}/> : results.data?.items?.length ? <>
-          {query && suggestions.length > 0 && <div className="search-assist-bar" role="region" aria-label="คำค้นใกล้เคียง">
-            <span>💡 คำค้นที่ใกล้เคียง:</span>
-            {suggestions.map((term) => <button type="button" key={term} className="suggestion-chip" onClick={() => applySuggestion(term)}>{term}</button>)}
+  useDocumentTitle(search ? (query ? `${t('ค้นหา', 'Search')} “${query}”` : t('ค้นหาคู่มือ', 'Search Guides')) : selectedCategory ? selectedCategory.categoryName : t('คลังความรู้และคู่มือ', 'Knowledge Library'))
+  return <main className="listing-page"><div className="shell"><div className="page-intro"><div className="breadcrumbs"><Link to="/">{t('หน้าแรก', 'Home')}</Link><span>/</span>{search ? t('ผลการค้นหา', 'Search Results') : categoryId && selectedCategory ? <><Link to="/articles">{t('คลังบทความ', 'Knowledge Library')}</Link><span>/</span><span>{selectedCategory.categoryName}</span></> : t('คลังบทความ', 'Knowledge Library')}</div><span className="eyebrow">ICT KNOWLEDGE LIBRARY</span><h1>{selectedCategory && !search ? selectedCategory.categoryName : search ? t('ผลการค้นหา', 'Search Results') : t('คลังความรู้และคู่มือ', 'Knowledge Library & Manuals')}</h1><p>{search ? (query ? <>{t('ผลลัพธ์สำหรับ', 'Showing results for')} <b>“{query}”</b></> : t('พิมพ์คำค้นเพื่อค้นหาคู่มือ', 'Enter a keyword to search for guides')) : t('ค้นหาคู่มือและวิธีแก้ไขปัญหาด้านเทคโนโลยีสารสนเทศ', 'Browse and search our collection of IT manuals and troubleshooting guides')}</p><SearchBox key={query} initial={query}/></div>
+    <div className="listing-layout"><aside className="filter-panel"><b>{t('หมวดหมู่ความรู้', 'Categories')}</b><button className={!categoryId ? 'active' : ''} onClick={() => updateFilter('category', '')}>{t('ทั้งหมด', 'All Categories')}</button>{(categories.data || []).map((rawCat) => { const c = translateCategory(rawCat); return <button key={c.categoryId} className={categoryId === String(c.categoryId) ? 'active' : ''} onClick={() => updateFilter('category', String(c.categoryId))}>{c.categoryName}</button> })}</aside>
+      <section className="listing-results"><div className="results-head"><span>{results.data?.total || 0} {t('บทความ', 'guides')}</span><select aria-label={t('เรียงลำดับ', 'Sort by')} value={params.get('sort') || 'recent'} onChange={(e) => updateFilter('sort', e.target.value)}><option value="recent">{t('ใหม่ล่าสุด', 'Most Recent')}</option><option value="popular">{t('ยอดเข้าชมสูงสุด', 'Most Viewed')}</option></select></div>
+        {results.loading ? <div className="loading">{t('กำลังค้นหาบทความ...', 'Searching guides...')}</div> : results.error ? <ErrorState message={results.error}/> : results.data?.items?.length ? <>
+          {query && suggestions.length > 0 && <div className="search-assist-bar" role="region" aria-label={t('คำค้นใกล้เคียง', 'Related search terms')}>
+            <span>💡 {t('คำค้นที่ใกล้เคียง:', 'Related keywords:')}</span>
+            {suggestions.map((term) => <button type="button" key={term} className="suggestion-chip" onClick={() => applySuggestion(term)}>{translateKeyword(term)}</button>)}
           </div>}
           <div className="article-grid">{(results.data?.items || []).map((a) => <ArticleCard key={a.articleId} article={a}/>)}</div>
-          {results.data.pageCount > 1 && <nav className="pagination" aria-label="เปลี่ยนหน้าผลการค้นหา"><button disabled={page <= 1} onClick={() => goToPage(page - 1)}>← ก่อนหน้า</button><span>หน้า {results.data.page} จาก {results.data.pageCount}</span><button disabled={page >= results.data.pageCount} onClick={() => goToPage(page + 1)}>ถัดไป →</button></nav>}
+          {results.data.pageCount > 1 && <nav className="pagination" aria-label={t('เปลี่ยนหน้าผลการค้นหา', 'Search results pagination')}><button disabled={page <= 1} onClick={() => goToPage(page - 1)}>← {t('ก่อนหน้า', 'Previous')}</button><span>{t(`หน้า ${results.data.page} จาก ${results.data.pageCount}`, `Page ${results.data.page} of ${results.data.pageCount}`)}</span><button disabled={page >= results.data.pageCount} onClick={() => goToPage(page + 1)}>{t('ถัดไป', 'Next')} →</button></nav>}
         </> : <>
           <div className="empty-state search-empty-box">
             <span>⌕</span>
-            <b>{query ? `ไม่พบบทความที่ตรงกับคำว่า “${query}”` : 'ไม่พบบทความในหมวดหมู่นี้'}</b>
-            <p>อาจเกิดจากการสะกดคำผิด ลืมเปลี่ยนภาษาแป้นพิมพ์ หรือใช้คำเฉพาะ — ลองเลือกคำค้นใกล้เคียงด้านล่างได้เลยครับ</p>
+            <b>{query ? t(`ไม่พบบทความที่ตรงกับคำว่า “${query}”`, `No guides matched “${query}”`) : t('ไม่พบบทความในหมวดหมู่นี้', 'No guides found in this category')}</b>
+            <p>{t('อาจเกิดจากการสะกดคำผิด ลืมเปลี่ยนภาษาแป้นพิมพ์ หรือใช้คำเฉพาะ — ลองเลือกคำค้นใกล้เคียงด้านล่างได้เลยครับ', 'This may be due to a typo or keyboard layout mismatch — try one of the suggested keywords below.')}</p>
             {didYouMean && <div className="did-you-mean-row">
-              <span>💡 คุณหมายถึงคำนี้หรือไม่:</span>
-              <button type="button" className="did-you-mean-btn" onClick={() => applySuggestion(didYouMean)}>⌕ ค้นหาคำว่า “{didYouMean}”</button>
+              <span>💡 {t('คุณหมายถึงคำนี้หรือไม่:', 'Did you mean:')}</span>
+              <button type="button" className="did-you-mean-btn" onClick={() => applySuggestion(didYouMean)}>⌕ {t(`ค้นหาคำว่า “${didYouMean}”`, `Search for “${translateKeyword(didYouMean)}”`)}</button>
             </div>}
             {suggestions.length > 0 && <div className="suggestions-block">
-              <small>คำค้นใกล้เคียงที่มีคู่มือในระบบ:</small>
+              <small>{t('คำค้นใกล้เคียงที่มีคู่มือในระบบ:', 'Suggested keywords with available guides:')}</small>
               <div className="suggestion-chip-list">
-                {suggestions.map((term) => <button type="button" key={term} className="suggestion-chip" onClick={() => applySuggestion(term)}>{term}</button>)}
+                {suggestions.map((term) => <button type="button" key={term} className="suggestion-chip" onClick={() => applySuggestion(term)}>{translateKeyword(term)}</button>)}
               </div>
             </div>}
-            {categoryId && <button type="button" className="clear-category-btn" onClick={() => updateFilter('category', '')}>ดูบทความจากทุกหมวดหมู่ →</button>}
+            {categoryId && <button type="button" className="clear-category-btn" onClick={() => updateFilter('category', '')}>{t('ดูบทความจากทุกหมวดหมู่ →', 'View Guides from All Categories →')}</button>}
           </div>
           {suggestedArticles.length > 0 && <div className="suggested-articles-section">
             <div className="section-heading">
               <div>
                 <span className="eyebrow">RECOMMENDED GUIDES</span>
-                <h2>คู่มือที่ใกล้เคียงกับคำค้นของคุณ</h2>
+                <h2>{t('คู่มือที่ใกล้เคียงกับคำค้นของคุณ', 'Recommended Guides Related to Your Search')}</h2>
               </div>
             </div>
             <div className="article-grid">
@@ -215,10 +248,12 @@ function ArticlesPage({ search = false }) {
 }
 
 function ArticlePage() {
+  const { t, formatDate, translateArticle } = useLang()
   const { id } = useParams()
   const [routeParams] = useSearchParams()
   const preview = routeParams.get('preview') === '1'
-  const { data: article, error, loading } = usePublicData(`/articles/${id}${preview ? '?preview=1' : ''}`)
+  const { data: rawArticle, error, loading } = usePublicData(`/articles/${id}${preview ? '?preview=1' : ''}`)
+  const article = translateArticle(rawArticle)
   const contact = usePublicData('/settings/contact')
   const [vote, setVote] = useState({ id: '', value: '', count: null, helpfulCount: null })
   const [sending, setSending] = useState(false)
@@ -234,8 +269,8 @@ function ArticlePage() {
     setFontScale(scale)
     try { window.localStorage.setItem('ict-reader-font-scale', scale) } catch { /* Ignore storage restrictions. */ }
   }
-  const related = usePublicData(article ? `/articles?category=${article.categoryId}&limit=6` : '')
-  useDocumentTitle(article?.title || (loading ? 'กำลังโหลดบทความ' : 'ไม่พบบทความ'))
+  const related = usePublicData(rawArticle ? `/articles?category=${rawArticle.categoryId}&limit=6` : '')
+  useDocumentTitle(article?.title || (loading ? t('กำลังโหลดบทความ', 'Loading Guide') : t('ไม่พบบทความ', 'Guide Not Found')))
   const voteValue = vote.id === id ? vote.value : ''
   let storedVote = null
   try { storedVote = window.localStorage.getItem(`ict-article-vote-${id}`) } catch { /* Voting remains available when storage is blocked. */ }
@@ -247,7 +282,7 @@ function ArticlePage() {
       const result = await api.post(`/articles/${id}/feedback`, { helpful, voterKey: feedbackKey() })
       try { window.localStorage.setItem(`ict-article-vote-${id}`, helpful ? 'yes' : 'no') } catch { /* The API still records this vote if local storage is unavailable. */ }
       setVote({ id, value: helpful ? 'yes' : 'no', count: result.count, helpfulCount: result.helpfulCount })
-    } catch (e) { setVote({ id, value: e.message || 'เกิดข้อผิดพลาด', count: null, helpfulCount: null }) }
+    } catch (e) { setVote({ id, value: e.message || t('เกิดข้อผิดพลาด', 'An error occurred'), count: null, helpfulCount: null }) }
     finally { setSending(false) }
   }
   async function copyLink() {
@@ -266,12 +301,12 @@ function ArticlePage() {
       const success = document.execCommand('copy')
       field.remove()
       setCopied(success)
-      setCopyError(success ? '' : 'ไม่สามารถคัดลอกลิงก์ได้ กรุณาคัดลอกจากแถบที่อยู่')
+      setCopyError(success ? '' : t('ไม่สามารถคัดลอกลิงก์ได้ กรุณาคัดลอกจากแถบที่อยู่', 'Could not copy link automatically. Please copy from the address bar.'))
       if (success) window.setTimeout(() => setCopied(false), 2500)
     }
   }
-  if (loading) return <main className="article-detail shell"><div className="loading">กำลังโหลดบทความ...</div></main>
-  if (error || !article) return <main className="article-detail shell"><ErrorState message={error || 'ไม่พบบทความนี้'}/><Link className="text-link" to="/articles">← กลับไปคลังบทความ</Link></main>
+  if (loading) return <main className="article-detail shell"><div className="loading">{t('กำลังโหลดบทความ...', 'Loading guide...')}</div></main>
+  if (error || !article) return <main className="article-detail shell"><ErrorState message={error || t('ไม่พบบทความนี้', 'Guide not found')}/><Link className="text-link" to="/articles">← {t('กลับไปคลังบทความ', 'Back to Knowledge Library')}</Link></main>
   const steps = Array.isArray(article.steps) ? article.steps : []
   const paragraphs = (article.content || '').split(/\n{2,}/).filter(Boolean)
   const relatedArticles = (related.data || []).filter((item) => item.articleId !== article.articleId).slice(0, 4)
@@ -288,33 +323,33 @@ function ArticlePage() {
   const lineShareHref = `https://social-plugins.line.me/lineit/share?url=${encodeURIComponent(shareUrl)}`
   const facebookShareHref = `https://www.facebook.com/sharer/sharer.php?u=${encodeURIComponent(shareUrl)}`
   return <main className="article-detail shell">
-    {preview && <div className="preview-banner" role="status"><b>โหมดดูตัวอย่างของเจ้าหน้าที่</b><span>การเปิดหน้านี้จะไม่ถูกนับเป็นยอดเข้าชม</span></div>}
+    {preview && <div className="preview-banner" role="status"><b>{t('โหมดดูตัวอย่างของเจ้าหน้าที่', 'Staff Preview Mode')}</b><span>{t('การเปิดหน้านี้จะไม่ถูกนับเป็นยอดเข้าชม', 'Viewing this page in preview mode does not increment the view count.')}</span></div>}
 
     <header className="article-hero-card">
       <div className="article-hero-main">
-        <div className="breadcrumbs"><Link to="/">หน้าแรก</Link><span>/</span><Link to={`/articles?category=${article.categoryId}`}>{article.category?.categoryName || 'คลังบทความ'}</Link><span>/</span><span>{article.title}</span></div>
-        <div className="article-meta"><Link to={`/articles?category=${article.categoryId}`}>{article.category?.categoryName}</Link><span>เผยแพร่ {dateLabel(article.publishedAt || article.createdAt)}</span></div>
+        <div className="breadcrumbs"><Link to="/">{t('หน้าแรก', 'Home')}</Link><span>/</span><Link to={`/articles?category=${article.categoryId}`}>{article.category?.categoryName || t('คลังบทความ', 'Knowledge Library')}</Link><span>/</span><span>{article.title}</span></div>
+        <div className="article-meta"><Link to={`/articles?category=${article.categoryId}`}>{article.category?.categoryName}</Link><span>{t('เผยแพร่', 'Published')} {formatDate(article.publishedAt || article.createdAt)}</span></div>
         <h1>{article.title}</h1>
         <div className="detail-stats">
-          <span>◷ เข้าชม {Number(article.viewCount || 0).toLocaleString('th-TH')} ครั้ง</span>
-          <span>✎ อัปเดตล่าสุด {dateLabel(article.updatedAt)}</span>
-          {steps.length > 0 && <span>✓ {steps.length} ขั้นตอนปฏิบัติ</span>}
-          {galleryImages.length > 1 && <span>🖼 {galleryImages.length} รูปภาพประกอบ</span>}
+          <span>◷ {t('เข้าชม', 'Views')} {Number(article.viewCount || 0).toLocaleString('th-TH')} {t('ครั้ง', '')}</span>
+          <span>✎ {t('อัปเดตล่าสุด', 'Last updated')} {formatDate(article.updatedAt)}</span>
+          {steps.length > 0 && <span>✓ {steps.length} {t('ขั้นตอนปฏิบัติ', 'Steps')}</span>}
+          {galleryImages.length > 1 && <span>🖼 {galleryImages.length} {t('รูปภาพประกอบ', 'Images')}</span>}
         </div>
         <div className="article-tools">
-          <button className="print-button" onClick={copyLink}>{copied ? '✓ คัดลอกลิงก์แล้ว' : '⧉ คัดลอกลิงก์คู่มือ'}</button>
-          <a className="share-button share-line-btn" href={lineShareHref} target="_blank" rel="noopener noreferrer" aria-label="แชร์คู่มือนี้ไปยัง LINE">
+          <button className="print-button" onClick={copyLink}>{copied ? t('✓ คัดลอกลิงก์แล้ว', '✓ Link Copied') : t('⧉ คัดลอกลิงก์คู่มือ', '⧉ Copy Guide Link')}</button>
+          <a className="share-button share-line-btn" href={lineShareHref} target="_blank" rel="noopener noreferrer" aria-label={t('แชร์คู่มือนี้ไปยัง LINE', 'Share this guide on LINE')}>
             <svg viewBox="0 0 24 24" width="17" height="17" fill="currentColor" aria-hidden="true"><path d="M19.365 9.863c.349 0 .63.285.63.631 0 .345-.281.63-.63.63H17.61v1.125h1.755c.349 0 .63.283.63.63 0 .344-.281.629-.63.629h-2.386c-.345 0-.627-.285-.627-.629V8.108c0-.345.282-.63.63-.63h2.386c.346 0 .627.285.627.63 0 .349-.281.63-.63.63H17.61v1.125h1.755zm-3.855 3.016c0 .27-.174.51-.432.596-.064.021-.133.031-.199.031-.211 0-.391-.09-.51-.25l-2.443-3.317v2.94c0 .344-.279.629-.631.629-.346 0-.626-.285-.626-.629V8.108c0-.27.173-.51.43-.595.06-.023.136-.033.194-.033.195 0 .375.104.495.254l2.462 3.33V8.108c0-.345.282-.63.63-.63.345 0 .63.285.63.63v4.771zm-5.741 0c0 .344-.282.629-.631.629-.345 0-.627-.285-.627-.629V8.108c0-.345.282-.63.63-.63.346 0 .628.285.628.63v4.771zm-2.466.629H4.917c-.345 0-.63-.285-.63-.629V8.108c0-.345.285-.63.63-.63.348 0 .63.285.63.63v4.141h1.756c.348 0 .629.283.629.63 0 .344-.282.629-.629.629M24 10.314C24 4.943 18.615.572 12 .572S0 4.943 0 10.314c0 4.811 4.27 8.842 10.035 9.608.391.082.923.258 1.058.59.12.301.079.766.038 1.08l-.164 1.02c-.045.301-.24 1.186 1.049.645 1.291-.539 6.916-4.078 9.436-6.975C23.176 14.393 24 12.458 24 10.314"/></svg>
-            <span>แชร์ไปยัง LINE</span>
+            <span>{t('แชร์ไปยัง LINE', 'Share on LINE')}</span>
           </a>
-          <a className="share-button share-fb-btn" href={facebookShareHref} target="_blank" rel="noopener noreferrer" aria-label="แชร์คู่มือนี้ไปยัง Facebook">
+          <a className="share-button share-fb-btn" href={facebookShareHref} target="_blank" rel="noopener noreferrer" aria-label={t('แชร์คู่มือนี้ไปยัง Facebook', 'Share this guide on Facebook')}>
             <svg viewBox="0 0 24 24" width="17" height="17" fill="currentColor" aria-hidden="true"><path d="M24 12.073c0-6.627-5.373-12-12-12s-12 5.373-12 12c0 5.99 4.388 10.954 10.125 11.854v-8.385H7.078v-3.47h3.047V9.43c0-3.007 1.792-4.669 4.533-4.669 1.312 0 2.686.235 2.686.235v2.953H15.83c-1.491 0-1.956.925-1.956 1.874v2.25h3.328l-.532 3.47h-2.796v8.385C19.612 23.027 24 18.062 24 12.073z"/></svg>
-            <span>แชร์ไปยัง Facebook</span>
+            <span>{t('แชร์ไปยัง Facebook', 'Share on Facebook')}</span>
           </a>
-          <button className="print-button" onClick={() => window.print()}>▤ พิมพ์คู่มือ / บันทึกเป็น PDF</button>
-          {mediaLink && <a className="print-button" href="#article-video">▶ ดูวิดีโอ / ลิงก์ประกอบ</a>}
-          {article.pdfFile && <button type="button" className="print-button" onClick={() => { setShowPdfViewer(true); window.setTimeout(() => document.getElementById('article-pdf')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 60) }}>👁 อ่าน PDF บนเว็บ</button>}
-          {article.pdfFile && <a className="download-button hero-pdf-btn" href={assetUrl(article.pdfFile)} download>⬇ ดาวน์โหลด PDF</a>}
+          <button className="print-button" onClick={() => window.print()}>▤ {t('พิมพ์คู่มือ / บันทึกเป็น PDF', 'Print / Save PDF')}</button>
+          {mediaLink && <a className="print-button" href="#article-video">▶ {t('ดูวิดีโอ / ลิงก์ประกอบ', 'Watch Video / Link')}</a>}
+          {article.pdfFile && <button type="button" className="print-button" onClick={() => { setShowPdfViewer(true); window.setTimeout(() => document.getElementById('article-pdf')?.scrollIntoView({ behavior: 'smooth', block: 'start' }), 60) }}>👁 {t('อ่าน PDF บนเว็บ', 'Read PDF Online')}</button>}
+          {article.pdfFile && <a className="download-button hero-pdf-btn" href={assetUrl(article.pdfFile)} download>⬇ {t('ดาวน์โหลด PDF', 'Download PDF')}</a>}
           {copyError && <span role="status">{copyError}</span>}
         </div>
       </div>
@@ -334,44 +369,44 @@ function ArticlePage() {
     <div className="detail-layout">
       <article className={`detail-main reader-scale-${fontScale}`}>
         {currentImage ? <div className="detail-gallery-box">
-          <button className="detail-image-button" onClick={() => setLightbox(true)} aria-label="ขยายภาพประกอบ">
-            <img className="detail-image" src={assetUrl(currentImage)} alt={`ภาพประกอบ ${article.title} (${activeImageIdx + 1}/${galleryImages.length})`}/>
-            <span>🔍 คลิกเพื่อดูภาพขยาย ({activeImageIdx + 1}/{galleryImages.length})</span>
+          <button className="detail-image-button" onClick={() => setLightbox(true)} aria-label={t('ขยายภาพประกอบ', 'Enlarge illustration')}>
+            <img className="detail-image" src={assetUrl(currentImage)} alt={`${t('ภาพประกอบ', 'Illustration')} ${article.title} (${activeImageIdx + 1}/${galleryImages.length})`}/>
+            <span>🔍 {t('คลิกเพื่อดูภาพขยาย', 'Click to Enlarge')} ({activeImageIdx + 1}/{galleryImages.length})</span>
           </button>
-          {galleryImages.length > 1 && <div className="detail-gallery-strip" role="region" aria-label="แกลเลอรีรูปภาพประกอบบทความ">
+          {galleryImages.length > 1 && <div className="detail-gallery-strip" role="region" aria-label={t('แกลเลอรีรูปภาพประกอบบทความ', 'Article image gallery')}>
             {galleryImages.map((imgPath, idx) => <button
               key={`${imgPath}-${idx}`}
               type="button"
               className={`gallery-thumb-btn${idx === activeImageIdx ? ' active' : ''}`}
               onClick={() => selectImage(idx)}
-              aria-label={`ดูรูปประกอบที่ ${idx + 1}`}
+              aria-label={`${t('ดูรูปประกอบที่', 'View image')} ${idx + 1}`}
             >
-              <img src={assetUrl(imgPath)} alt={`รูปประกอบที่ ${idx + 1}`}/>
-              <small>รูปที่ {idx + 1}</small>
+              <img src={assetUrl(imgPath)} alt={`${t('รูปประกอบที่', 'Image')} ${idx + 1}`}/>
+              <small>{t(`รูปที่ ${idx + 1}`, `Image ${idx + 1}`)}</small>
             </button>)}
           </div>}
-        </div> : <div className="detail-placeholder" aria-label={`หมวดหมู่ ${article.category?.categoryName}`}><span>{categoryIcons[(Number(article.categoryId || 1) - 1) % categoryIcons.length] || '▣'}</span><b>{article.category?.categoryName || 'คู่มือ ICT'}</b></div>}
+        </div> : <div className="detail-placeholder" aria-label={`${t('หมวดหมู่', 'Category')} ${article.category?.categoryName}`}><span>{categoryIcons[(Number(article.categoryId || 1) - 1) % categoryIcons.length] || '▣'}</span><b>{article.category?.categoryName || t('คู่มือ ICT', 'ICT Guide')}</b></div>}
 
         <div id="article-intro" className="article-content">
           <div className="content-section-bar">
             <div>
-              <span>📖 รายละเอียดและคำอธิบายประกอบ</span>
-              <small>อ่านทำความเข้าใจก่อนเริ่มปฏิบัติตามขั้นตอน</small>
+              <span>📖 {t('รายละเอียดและคำอธิบายประกอบ', 'Overview & Detailed Explanation')}</span>
+              <small>{t('อ่านทำความเข้าใจก่อนเริ่มปฏิบัติตามขั้นตอน', 'Read through this overview before following the step-by-step instructions.')}</small>
             </div>
-            <div className="font-scale-controls" role="group" aria-label="ปรับขนาดตัวอักษรเนื้อหาบทความ">
-              <small>ขนาดตัวอักษร</small>
-              <button type="button" className={fontScale === 'normal' ? 'active' : ''} onClick={() => changeFontScale('normal')} aria-pressed={fontScale === 'normal'} title="ขนาดตัวอักษรปกติ">ก</button>
-              <button type="button" className={fontScale === 'large' ? 'active' : ''} onClick={() => changeFontScale('large')} aria-pressed={fontScale === 'large'} title="ขนาดตัวอักษรใหญ่">ก+</button>
-              <button type="button" className={fontScale === 'xlarge' ? 'active' : ''} onClick={() => changeFontScale('xlarge')} aria-pressed={fontScale === 'xlarge'} title="ขนาดตัวอักษรใหญ่มาก">ก++</button>
+            <div className="font-scale-controls" role="group" aria-label={t('ปรับขนาดตัวอักษรเนื้อหาบทความ', 'Adjust article font size')}>
+              <small>{t('ขนาดตัวอักษร', 'Text Size')}</small>
+              <button type="button" className={fontScale === 'normal' ? 'active' : ''} onClick={() => changeFontScale('normal')} aria-pressed={fontScale === 'normal'} title={t('ขนาดตัวอักษรปกติ', 'Normal text size')}>{t('ก', 'A')}</button>
+              <button type="button" className={fontScale === 'large' ? 'active' : ''} onClick={() => changeFontScale('large')} aria-pressed={fontScale === 'large'} title={t('ขนาดตัวอักษรใหญ่', 'Large text size')}>{t('ก+', 'A+')}</button>
+              <button type="button" className={fontScale === 'xlarge' ? 'active' : ''} onClick={() => changeFontScale('xlarge')} aria-pressed={fontScale === 'xlarge'} title={t('ขนาดตัวอักษรใหญ่มาก', 'Extra large text size')}>{t('ก++', 'A++')}</button>
             </div>
           </div>
           {paragraphs.map((paragraph, index) => {
-            const headingMatch = paragraph.match(/^(เกริ่นนำ|ข้อควรทราบ[^\n]*|คำแนะนำ[^\n]*|สาเหตุ[^\n]*)\s*\n([\s\S]*)$/)
+            const headingMatch = paragraph.match(/^(เกริ่นนำ|ข้อควรทราบ[^\n]*|คำแนะนำ[^\n]*|สาเหตุ[^\n]*|Introduction|Important Note[^\n]*|Recommendation[^\n]*|Cause[^\n]*)\s*\n([\s\S]*)$/)
             return headingMatch ? <section key={`paragraph-${index}`} className="content-callout-block"><h2>{headingMatch[1]}</h2><p>{headingMatch[2]}</p></section> : <p key={`paragraph-${index}`}>{paragraph}</p>
           })}
         </div>
 
-        {steps.length > 0 && <section id="article-steps" className="steps-box"><div className="steps-box-head"><div><span className="eyebrow">STEP-BY-STEP WORKFLOW</span><h2>ขั้นตอนการแก้ไขปัญหาอย่างเป็นลำดับ</h2></div><span className="steps-count-pill">{steps.length} ขั้นตอน</span></div><ol>{steps.map((step, index) => <li key={`step-${index}`}>{typeof step === 'string' ? step.replace(/^\s*\d+[.)]\s*/, '') : step?.text || JSON.stringify(step)}</li>)}</ol></section>}
+        {steps.length > 0 && <section id="article-steps" className="steps-box"><div className="steps-box-head"><div><span className="eyebrow">STEP-BY-STEP WORKFLOW</span><h2>{t('ขั้นตอนการแก้ไขปัญหาอย่างเป็นลำดับ', 'Step-by-Step Troubleshooting Instructions')}</h2></div><span className="steps-count-pill">{steps.length} {t('ขั้นตอน', 'Steps')}</span></div><ol>{steps.map((step, index) => <li key={`step-${index}`}>{typeof step === 'string' ? step.replace(/^\s*\d+[.)]\s*/, '') : step?.text || JSON.stringify(step)}</li>)}</ol></section>}
 
         {mediaLink && <section id="article-video" className="video-guide-box">
           <div className="video-guide-head">
@@ -379,13 +414,13 @@ function ArticlePage() {
               <span className="video-emblem" aria-hidden="true">▶</span>
               <div>
                 <span className="eyebrow">VIDEO & REFERENCE LINK · {mediaLink.provider}</span>
-                <h2>{mediaLink.type === 'link' ? 'ลิงก์วิดีโอ / แหล่งข้อมูลประกอบบทความ' : 'วิดีโอสาธิตประกอบคู่มือ'}</h2>
+                <h2>{mediaLink.type === 'link' ? t('ลิงก์วิดีโอ / แหล่งข้อมูลประกอบบทความ', 'Accompanying Video & Reference Link') : t('วิดีโอสาธิตประกอบคู่มือ', 'Video Tutorial Guide')}</h2>
               </div>
             </div>
-            <a className="download-button video-ext-btn" href={mediaLink.href} target="_blank" rel="noreferrer">↗ เปิดลิงก์บน {mediaLink.provider}</a>
+            <a className="download-button video-ext-btn" href={mediaLink.href} target="_blank" rel="noreferrer">↗ {t(`เปิดลิงก์บน ${mediaLink.provider}`, `Open on ${mediaLink.provider}`)}</a>
           </div>
           {(mediaLink.type === 'youtube' || mediaLink.type === 'gdrive') && <div className="video-frame-wrap">
-            <iframe src={mediaLink.embedUrl} title={`วิดีโอประกอบ ${article.title}`} loading="lazy" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowFullScreen/>
+            <iframe src={mediaLink.embedUrl} title={`${t('วิดีโอประกอบ', 'Video Tutorial')} ${article.title}`} loading="lazy" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" allowFullScreen/>
           </div>}
           {mediaLink.type === 'video' && <div className="video-frame-wrap">
             <video controls preload="metadata" src={mediaLink.href}/>
@@ -393,7 +428,7 @@ function ArticlePage() {
           {mediaLink.type === 'link' && <a className="external-link-card" href={mediaLink.href} target="_blank" rel="noreferrer">
             <span className="ext-link-icon" aria-hidden="true">🔗</span>
             <div className="ext-link-copy">
-              <b>คลิกเพื่อเปิดวิดีโอหรือลิงก์ข้อมูลประกอบ ({mediaLink.hostname})</b>
+              <b>{t(`คลิกเพื่อเปิดวิดีโอหรือลิงก์ข้อมูลประกอบ (${mediaLink.hostname})`, `Click to open video or reference link (${mediaLink.hostname})`)}</b>
               <small>{mediaLink.href}</small>
             </div>
             <span className="ext-link-arrow" aria-hidden="true">↗</span>
@@ -405,8 +440,8 @@ function ArticlePage() {
             <div className="pdf-banner-info">
               <span className="pdf-emblem" aria-hidden="true">PDF</span>
               <div>
-                <b>คู่มือฉบับสมบูรณ์พร้อมพิมพ์ (PDF A4)</b>
-                <p>กดเปิดอ่านบนหน้าเว็บนี้ได้ทันทีเหมือน E-Book หรือดาวน์โหลดเก็บไว้ในเครื่องเพื่อเปิดดูแบบออฟไลน์</p>
+                <b>{t('คู่มือฉบับสมบูรณ์พร้อมพิมพ์ (PDF A4)', 'Complete Printable Manual (A4 PDF)')}</b>
+                <p>{t('กดเปิดอ่านบนหน้าเว็บนี้ได้ทันทีเหมือน E-Book หรือดาวน์โหลดเก็บไว้ในเครื่องเพื่อเปิดดูแบบออฟไลน์', 'Read directly on this page like an E-Book or download the PDF file for offline reference.')}</p>
               </div>
             </div>
             <div className="pdf-banner-actions">
@@ -416,35 +451,35 @@ function ArticlePage() {
                 aria-expanded={showPdfViewer}
                 onClick={() => setShowPdfViewer((v) => !v)}
               >
-                {showPdfViewer ? '▴ ซ่อนหน้าต่างอ่าน PDF' : '👁 เปิดอ่าน PDF บนหน้าเว็บนี้'}
+                {showPdfViewer ? t('▴ ซ่อนหน้าต่างอ่าน PDF', '▴ Hide PDF Reader') : t('👁 เปิดอ่าน PDF บนหน้าเว็บนี้', '👁 Read PDF on This Page')}
               </button>
-              <a className="print-button" href={assetUrl(article.pdfFile)} target="_blank" rel="noreferrer">↗ เปิดแท็บใหม่</a>
-              <a className="download-button" href={assetUrl(article.pdfFile)} download>⬇ ดาวน์โหลด PDF</a>
+              <a className="print-button" href={assetUrl(article.pdfFile)} target="_blank" rel="noreferrer">↗ {t('เปิดแท็บใหม่', 'Open in New Tab')}</a>
+              <a className="download-button" href={assetUrl(article.pdfFile)} download>⬇ {t('ดาวน์โหลด PDF', 'Download PDF')}</a>
             </div>
           </div>
-          {showPdfViewer && <div className="pdf-viewer-shell" role="region" aria-label="หน้าต่างอ่านเอกสารคู่มือ PDF">
+          {showPdfViewer && <div className="pdf-viewer-shell" role="region" aria-label={t('หน้าต่างอ่านเอกสารคู่มือ PDF', 'Embedded PDF Document Reader')}>
             <div className="pdf-viewer-bar">
-              <span>📄 กำลังแสดงคู่มือ PDF: <b>{article.title}</b></span>
+              <span>📄 {t('กำลังแสดงคู่มือ PDF:', 'Viewing PDF Manual:')} <b>{article.title}</b></span>
               <div className="pdf-viewer-tools">
-                <a href={assetUrl(article.pdfFile)} target="_blank" rel="noreferrer">↗ ขยายเต็มจอในแท็บใหม่</a>
-                <button type="button" onClick={() => setShowPdfViewer(false)}>× ปิดหน้าต่างอ่าน</button>
+                <a href={assetUrl(article.pdfFile)} target="_blank" rel="noreferrer">↗ {t('ขยายเต็มจอในแท็บใหม่', 'Open Full Screen in New Tab')}</a>
+                <button type="button" onClick={() => setShowPdfViewer(false)}>× {t('ปิดหน้าต่างอ่าน', 'Close Reader')}</button>
               </div>
             </div>
             <iframe
               className="pdf-viewer-frame"
               src={`${assetUrl(article.pdfFile)}#view=FitH`}
-              title={`เอกสารคู่มือ PDF ${article.title}`}
+              title={`${t('เอกสารคู่มือ PDF', 'PDF Manual')} ${article.title}`}
             />
           </div>}
         </section>}
 
-        {Array.isArray(article.keywords) && article.keywords.length > 0 && <div className="article-keywords" aria-label="คำสำคัญของบทความ"><b>คำค้นและหัวข้อที่เกี่ยวข้อง:</b><div className="keyword-list">{article.keywords.map((keyword) => <Link key={keyword} className="keyword-tag" to={`/search?q=${encodeURIComponent(keyword)}`}>#{keyword}</Link>)}</div></div>}
+        {Array.isArray(article.keywords) && article.keywords.length > 0 && <div className="article-keywords" aria-label={t('คำสำคัญของบทความ', 'Article keywords')}><b>{t('คำค้นและหัวข้อที่เกี่ยวข้อง:', 'Related Keywords & Topics:')}</b><div className="keyword-list">{(rawArticle?.keywords || article.keywords).map((rawKw, idx) => <Link key={rawKw} className="keyword-tag" to={`/search?q=${encodeURIComponent(rawKw)}`}>#{article.keywords[idx] || rawKw}</Link>)}</div></div>}
 
-        <div id="article-feedback" className="feedback-box"><b>คู่มือนี้ช่วยให้คุณแก้ปัญหาได้สำเร็จหรือไม่?</b><p className="feedback-count">มีผู้ประเมิน {Number(feedbackCount || 0)} คน · มีประโยชน์ {Number(helpfulCount || 0)} คน ({feedbackCount ? Math.round(helpfulCount * 100 / feedbackCount) : 0}%)</p>{voteValue === 'yes' || voteValue === 'no' || storedVote ? <p className="thanks">✓ ขอบคุณสำหรับความคิดเห็นของคุณ เพื่อนำไปพัฒนาคู่มือต่อไป</p> : voteValue ? <p className="feedback-error">{voteValue}</p> : <div><button disabled={sending} onClick={() => sendVote(true)}>👍 มีประโยชน์ ทำตามได้จริง</button><button disabled={sending} onClick={() => sendVote(false)}>👎 ยังไม่ช่วยแก้ปัญหา</button></div>}</div>
+        <div id="article-feedback" className="feedback-box"><b>{t('คู่มือนี้ช่วยให้คุณแก้ปัญหาได้สำเร็จหรือไม่?', 'Was this guide helpful in solving your issue?')}</b><p className="feedback-count">{t(`มีผู้ประเมิน ${Number(feedbackCount || 0)} คน · มีประโยชน์ ${Number(helpfulCount || 0)} คน`, `${Number(feedbackCount || 0)} ratings · ${Number(helpfulCount || 0)} found this helpful`)} ({feedbackCount ? Math.round(helpfulCount * 100 / feedbackCount) : 0}%)</p>{voteValue === 'yes' || voteValue === 'no' || storedVote ? <p className="thanks">✓ {t('ขอบคุณสำหรับความคิดเห็นของคุณ เพื่อนำไปพัฒนาคู่มือต่อไป', 'Thank you for your feedback! It helps us improve our guides.')}</p> : voteValue ? <p className="feedback-error">{voteValue}</p> : <div><button disabled={sending} onClick={() => sendVote(true)}>👍 {t('มีประโยชน์ ทำตามได้จริง', 'Yes, Helpful & Clear')}</button><button disabled={sending} onClick={() => sendVote(false)}>👎 {t('ยังไม่ช่วยแก้ปัญหา', 'Not Helpful Yet')}</button></div>}</div>
 
-        <ContactCard contact={contact.data} title="คู่มือนี้ยังไม่ช่วยแก้ปัญหา? ติดต่อเจ้าหน้าที่ศูนย์ ICT" className="article-contact-card"/>
+        <ContactCard contact={contact.data} title={t('คู่มือนี้ยังไม่ช่วยแก้ปัญหา? ติดต่อเจ้าหน้าที่ศูนย์ ICT', 'Still need assistance? Contact Khon Kaen ICT Center Staff')} className="article-contact-card"/>
 
-        <section className="related-section"><div className="section-heading"><div><span className="eyebrow">RELATED GUIDES</span><h2>บทความที่เกี่ยวข้องในหมวดหมู่นี้</h2></div><Link className="text-link" to={`/articles?category=${article.categoryId}`}>ดูทั้งหมดในหมวดนี้ <b>→</b></Link></div>{relatedArticles.length ? <div className="article-grid">{relatedArticles.map((item) => <ArticleCard key={item.articleId} article={item}/>)}</div> : <Link to={`/articles?category=${article.categoryId}`}>ดูบทความเพิ่มเติมในหมวดหมู่นี้ →</Link>}</section>
+        <section className="related-section"><div className="section-heading"><div><span className="eyebrow">RELATED GUIDES</span><h2>{t('บทความที่เกี่ยวข้องในหมวดหมู่นี้', 'Related Guides in This Category')}</h2></div><Link className="text-link" to={`/articles?category=${article.categoryId}`}>{t('ดูทั้งหมดในหมวดนี้', 'View All in Category')} <b>→</b></Link></div>{relatedArticles.length ? <div className="article-grid">{relatedArticles.map((item) => <ArticleCard key={item.articleId} article={item}/>)}</div> : <Link to={`/articles?category=${article.categoryId}`}>{t('ดูบทความเพิ่มเติมในหมวดหมู่นี้ →', 'Explore more guides in this category →')}</Link>}</section>
       </article>
 
       <aside className="detail-aside">
@@ -452,66 +487,66 @@ function ArticlePage() {
           <div className="aside-master-head">
             <span className="aside-master-icon" aria-hidden="true">{categoryIcons[(Number(article.categoryId || 1) - 1) % categoryIcons.length] || '▣'}</span>
             <div>
-              <span className="eyebrow">ข้อมูลคู่มือ</span>
-              <b>รายละเอียดบทความ</b>
+              <span className="eyebrow">{t('ข้อมูลคู่มือ', 'GUIDE INFO')}</span>
+              <b>{t('รายละเอียดบทความ', 'Guide Summary')}</b>
             </div>
           </div>
 
           <div className="aside-stat-tiles">
             <div className="aside-tile">
-              <small>จำนวนขั้นตอน</small>
-              <b>{steps.length} ขั้นตอน</b>
+              <small>{t('จำนวนขั้นตอน', 'Total Steps')}</small>
+              <b>{steps.length} {t('ขั้นตอน', 'Steps')}</b>
             </div>
             <div className="aside-tile is-gold">
-              <small>จำนวนเข้าชม</small>
-              <b>{Number(article.viewCount || 0).toLocaleString('th-TH')} ครั้ง</b>
+              <small>{t('จำนวนเข้าชม', 'Total Views')}</small>
+              <b>{Number(article.viewCount || 0).toLocaleString('th-TH')} {t('ครั้ง', '')}</b>
             </div>
           </div>
 
           <div className="aside-meta-list">
-            <p>หมวดหมู่ <Link to={`/articles?category=${article.categoryId}`}>{article.category?.categoryName}</Link></p>
-            <p>เผยแพร่เมื่อ <span>{dateLabel(article.publishedAt || article.createdAt)}</span></p>
-            <p>แก้ไขล่าสุด <span>{dateLabel(article.updatedAt)}</span></p>
+            <p>{t('หมวดหมู่', 'Category')} <Link to={`/articles?category=${article.categoryId}`}>{article.category?.categoryName}</Link></p>
+            <p>{t('เผยแพร่เมื่อ', 'Published')} <span>{formatDate(article.publishedAt || article.createdAt)}</span></p>
+            <p>{t('แก้ไขล่าสุด', 'Updated')} <span>{formatDate(article.updatedAt)}</span></p>
           </div>
 
-          <nav className="aside-timeline-nav" aria-label="สารบัญภายในบทความ">
-            <span className="aside-nav-heading">สารบัญในหน้านี้</span>
-            <a href="#article-intro"><i/><span>รายละเอียดและคำอธิบาย</span></a>
-            {steps.length > 0 && <a href="#article-steps"><i/><span>ขั้นตอนการปฏิบัติ ({steps.length})</span></a>}
-            {mediaLink && <a href="#article-video"><i/><span>วิดีโอ / ลิงก์ประกอบ</span></a>}
-            {article.pdfFile && <a href="#article-pdf"><i/><span>เอกสารคู่มือ PDF</span></a>}
-            <a href="#article-feedback"><i/><span>ประเมินความพึงพอใจ</span></a>
+          <nav className="aside-timeline-nav" aria-label={t('สารบัญภายในบทความ', 'Table of contents')}>
+            <span className="aside-nav-heading">{t('สารบัญในหน้านี้', 'ON THIS PAGE')}</span>
+            <a href="#article-intro"><i/><span>{t('รายละเอียดและคำอธิบาย', 'Overview & Explanation')}</span></a>
+            {steps.length > 0 && <a href="#article-steps"><i/><span>{t('ขั้นตอนการปฏิบัติ', 'Step-by-Step Guide')} ({steps.length})</span></a>}
+            {mediaLink && <a href="#article-video"><i/><span>{t('วิดีโอ / ลิงก์ประกอบ', 'Video / Reference Link')}</span></a>}
+            {article.pdfFile && <a href="#article-pdf"><i/><span>{t('เอกสารคู่มือ PDF', 'Printable PDF Manual')}</span></a>}
+            <a href="#article-feedback"><i/><span>{t('ประเมินความพึงพอใจ', 'Rate This Guide')}</span></a>
           </nav>
 
-          {article.pdfFile && <a className="aside-pdf-cta" href={assetUrl(article.pdfFile)} download>⬇ ดาวน์โหลดคู่มือ PDF (A4)</a>}
+          {article.pdfFile && <a className="aside-pdf-cta" href={assetUrl(article.pdfFile)} download>⬇ {t('ดาวน์โหลดคู่มือ PDF (A4)', 'Download PDF Manual (A4)')}</a>}
         </div>
 
         {quickHelpHref && <a className="aside-support-pill" href={quickHelpHref}>
           <span className="support-pill-icon" aria-hidden="true">☎</span>
           <div>
-            <b>ติดปัญหา สอบถามเจ้าหน้าที่</b>
-            <small>{contact.data?.phone ? `โทร ${contact.data.phone} · ศูนย์ ICT ขอนแก่น` : 'ศูนย์พัฒนาทักษะและการเรียนรู้ ICT ขอนแก่น'}</small>
+            <b>{t('ติดปัญหา สอบถามเจ้าหน้าที่', 'Need Help? Contact ICT Staff')}</b>
+            <small>{contact.data?.phone ? t(`โทร ${contact.data.phone} · ศูนย์ ICT ขอนแก่น`, `Call ${contact.data.phone} · Khon Kaen ICT Center`) : t('ศูนย์พัฒนาทักษะและการเรียนรู้ ICT ขอนแก่น', 'Khon Kaen Municipality ICT Learning Center')}</small>
           </div>
           <span className="support-pill-arrow" aria-hidden="true">→</span>
         </a>}
       </aside>
     </div>
-    {lightbox && currentImage && <div className="lightbox" role="dialog" aria-modal="true" aria-label="ภาพประกอบขนาดใหญ่" onClick={() => setLightbox(false)}>
-      <button className="lightbox-close" onClick={() => setLightbox(false)} aria-label="ปิดภาพ">×</button>
+    {lightbox && currentImage && <div className="lightbox" role="dialog" aria-modal="true" aria-label={t('ภาพประกอบขนาดใหญ่', 'Full-size illustration')} onClick={() => setLightbox(false)}>
+      <button className="lightbox-close" onClick={() => setLightbox(false)} aria-label={t('ปิดภาพ', 'Close image')}>×</button>
       {galleryImages.length > 1 && <button
         type="button"
         className="lightbox-nav lightbox-prev"
-        aria-label="รูปก่อนหน้า"
+        aria-label={t('รูปก่อนหน้า', 'Previous image')}
         onClick={(e) => { e.stopPropagation(); selectImage((activeImageIdx - 1 + galleryImages.length) % galleryImages.length) }}
       >‹</button>}
       <div className="lightbox-stage" onClick={(e) => e.stopPropagation()}>
-        <img src={assetUrl(currentImage)} alt={`ภาพประกอบ ${article.title} (${activeImageIdx + 1}/${galleryImages.length})`}/>
-        {galleryImages.length > 1 && <div className="lightbox-caption">รูปที่ {activeImageIdx + 1} จาก {galleryImages.length}</div>}
+        <img src={assetUrl(currentImage)} alt={`${t('ภาพประกอบ', 'Illustration')} ${article.title} (${activeImageIdx + 1}/${galleryImages.length})`}/>
+        {galleryImages.length > 1 && <div className="lightbox-caption">{t(`รูปที่ ${activeImageIdx + 1} จาก ${galleryImages.length}`, `Image ${activeImageIdx + 1} of ${galleryImages.length}`)}</div>}
       </div>
       {galleryImages.length > 1 && <button
         type="button"
         className="lightbox-nav lightbox-next"
-        aria-label="รูปถัดไป"
+        aria-label={t('รูปถัดไป', 'Next image')}
         onClick={(e) => { e.stopPropagation(); selectImage((activeImageIdx + 1) % galleryImages.length) }}
       >›</button>}
     </div>}
@@ -521,7 +556,7 @@ function ArticlePage() {
 function PublicLayout() { return <><Header/><Outlet/><Footer/></> }
 
 function App() {
-  return <Routes>
+  return <LanguageProvider><Routes>
     <Route path="/admin/login" element={<AdminLoginPage/>}/>
     <Route path="/admin" element={<AdminPage/>}>
       <Route index element={<AdminHome/>}/>
@@ -539,7 +574,7 @@ function App() {
       <Route path="/articles/:id" element={<ArticlePage/>}/>
       <Route path="*" element={<NotFoundPage/>}/>
     </Route>
-  </Routes>
+  </Routes></LanguageProvider>
 }
 
 export default App
