@@ -64,7 +64,38 @@ function normalizeArticleImages(article) {
   const rawList = Array.isArray(article.images) ? article.images.filter(Boolean) : []
   const images = rawList.length ? rawList : (article.image ? [article.image] : [])
   const image = article.image || images[0] || null
-  return { ...article, image, images }
+  const keywords = Array.isArray(article.keywords) ? article.keywords.filter(Boolean) : []
+  const steps = Array.isArray(article.steps) ? article.steps : []
+  return { ...article, image, images, keywords, steps }
+}
+
+function articleMatchesTerm(article, rawTerm) {
+  const term = String(rawTerm || '').toLowerCase()
+  const compact = term.replace(/-/g, '') || term
+  const title = String(article.title || '').toLowerCase()
+  const titleCompact = title.replace(/-/g, '')
+  const content = String(article.content || '').toLowerCase()
+  const contentCompact = content.replace(/-/g, '')
+  const keywords = Array.isArray(article.keywords) ? article.keywords.map((k) => String(k || '').toLowerCase()) : []
+  return (
+    title.includes(term) ||
+    content.includes(term) ||
+    titleCompact.includes(compact) ||
+    contentCompact.includes(compact) ||
+    keywords.some((kw) => kw === term || kw.replace(/-/g, '') === compact || kw.includes(term))
+  )
+}
+
+function articleRelevanceRank(article, rawQuery) {
+  const q = String(rawQuery || '').toLowerCase()
+  const compactQuery = q.replace(/-/g, '') || q
+  const title = String(article.title || '').toLowerCase()
+  const titleCompact = title.replace(/-/g, '')
+  const keywords = Array.isArray(article.keywords) ? article.keywords.map((k) => String(k || '').toLowerCase()) : []
+  if (title === q || titleCompact === compactQuery) return 0
+  if (title.includes(q) || titleCompact.includes(compactQuery)) return 1
+  if (keywords.some((kw) => kw === q || kw.replace(/-/g, '') === compactQuery)) return 2
+  return 3
 }
 
 const EN_LAYOUT = "1234567890-=qwertyuiop[]\\asdfghjkl;'zxcvbnm,./!@#$%^&*()_+QWERTYUIOP{}|ASDFGHJKL:\"ZXCVBNM<>?"
@@ -272,17 +303,15 @@ router.get('/articles', async (req, res, next) => {
     if (req.query.category && Number.isInteger(categoryId) && categoryId > 0) where.categoryId = categoryId
     if (req.query.featured === 'true') where.featured = true
     const query = typeof req.query.q === 'string' ? req.query.q.trim().slice(0, 120) : ''
-    if (query) {
-      const terms = [...new Set(query.split(/\s+/).filter(Boolean))].slice(0, 8)
-      where.OR = terms.flatMap((term) => [
-        { title: { contains: term, mode: 'insensitive' } },
-        { content: { contains: term, mode: 'insensitive' } },
-        { keywords: { has: term } },
-      ])
-    }
     const orderBy = req.query.sort === 'popular' ? [{ viewCount: 'desc' }, { publishedAt: 'desc' }] : [{ publishedAt: 'desc' }, { createdAt: 'desc' }]
-    const articles = await prisma.article.findMany({ where, orderBy, take: limit, select: articleSelect })
-    res.json(articles.map(normalizeArticleImages))
+    if (!query) {
+      const articles = await prisma.article.findMany({ where, orderBy, take: limit, select: articleSelect })
+      return res.json(articles.map(normalizeArticleImages))
+    }
+    const terms = [...new Set(query.split(/\s+/).filter(Boolean))].slice(0, 8)
+    const allArticles = await prisma.article.findMany({ where, orderBy, select: articleSelect })
+    const matched = allArticles.filter((article) => terms.some((term) => articleMatchesTerm(article, term))).slice(0, limit)
+    res.json(matched.map(normalizeArticleImages))
   } catch (error) { next(error) }
 })
 
@@ -295,69 +324,39 @@ router.get('/articles/search', async (req, res, next) => {
     const categoryId = Number.parseInt(req.query.category, 10)
     const categoryFilter = req.query.category && Number.isInteger(categoryId) && categoryId > 0 ? { categoryId } : {}
     const where = { ...publicArticle, ...categoryFilter }
-    if (terms.length) where.OR = terms.flatMap((term) => [
-      { title: { contains: term, mode: 'insensitive' } },
-      { content: { contains: term, mode: 'insensitive' } },
-      { keywords: { has: term } },
-    ])
-    const categoryClause = Object.hasOwn(categoryFilter, 'categoryId') ? Prisma.sql`AND a.category_id = ${categoryId}` : Prisma.empty
-    const termConditions = terms.map((term) => {
-      const compact = term.replace(/-/g, '') || term
-      return Prisma.sql`(
-        position(lower(${term}) in lower(a.title)) > 0 OR
-        position(lower(${term}) in lower(a.content)) > 0 OR
-        EXISTS (SELECT 1 FROM unnest(a.keywords) AS k(value) WHERE lower(k.value) = lower(${term})) OR
-        position(lower(${compact}) in replace(lower(a.title), '-', '')) > 0 OR
-        position(lower(${compact}) in replace(lower(a.content), '-', '')) > 0 OR
-        EXISTS (SELECT 1 FROM unnest(a.keywords) AS k(value) WHERE replace(lower(k.value), '-', '') = lower(${compact}))
-      )`
-    })
-    const searchClause = terms.length ? Prisma.sql`AND (${Prisma.join(termConditions, ' OR ')})` : Prisma.empty
+    const skip = (page - 1) * pageSize
+    const orderBy = req.query.sort === 'popular' ? [{ viewCount: 'desc' }, { publishedAt: 'desc' }] : [{ publishedAt: 'desc' }, { createdAt: 'desc' }]
+
     let total
+    let items
     if (terms.length) {
-      const [countRow] = await prisma.$queryRaw(Prisma.sql`
-        SELECT COUNT(*)::int AS total
-        FROM articles a
-        WHERE a.status = 'PUBLISHED' ${categoryClause} ${searchClause}
-      `)
-      total = countRow.total
+      const candidates = await prisma.article.findMany({ where, orderBy, select: articleSelect })
+      const matched = candidates.filter((article) => terms.some((term) => articleMatchesTerm(article, term)))
+      if (req.query.sort !== 'popular') {
+        matched.sort((a, b) => {
+          const rA = articleRelevanceRank(a, query)
+          const rB = articleRelevanceRank(b, query)
+          if (rA !== rB) return rA - rB
+          const tA = a.publishedAt ? new Date(a.publishedAt).getTime() : 0
+          const tB = b.publishedAt ? new Date(b.publishedAt).getTime() : 0
+          return tB - tA
+        })
+      }
+      total = matched.length
+      items = matched.slice(skip, skip + pageSize).map(normalizeArticleImages)
     } else {
       total = await prisma.article.count({ where })
+      const rawItems = await prisma.article.findMany({ where, orderBy, skip, take: pageSize, select: articleSelect })
+      items = rawItems.map(normalizeArticleImages)
     }
+
     if (query && page === 1) {
       const term = query.toLocaleLowerCase('th-TH').trim().slice(0, 120)
       if (!isProfaneSearchTerm(term) && firstHitInWindow(`search:${visitorFingerprint(req)}:${term}`)) {
         prisma.searchLog.create({ data: { term, resultCount: total } }).catch(() => {})
       }
     }
-    const skip = (page - 1) * pageSize
-    const orderBy = req.query.sort === 'popular' ? [{ viewCount: 'desc' }, { publishedAt: 'desc' }] : [{ publishedAt: 'desc' }, { createdAt: 'desc' }]
-    let items
-    if (terms.length) {
-      const compactQuery = query.replace(/-/g, '') || query
-      const orderClause = req.query.sort === 'popular'
-        ? Prisma.sql`a.view_count DESC, a.published_at DESC`
-        : Prisma.sql`CASE
-            WHEN lower(a.title) = lower(${query}) OR replace(lower(a.title), '-', '') = lower(${compactQuery}) THEN 0
-            WHEN position(lower(${query}) in lower(a.title)) > 0 OR position(lower(${compactQuery}) in replace(lower(a.title), '-', '')) > 0 THEN 1
-            WHEN EXISTS (SELECT 1 FROM unnest(a.keywords) AS k(value) WHERE lower(k.value) = lower(${query}) OR replace(lower(k.value), '-', '') = lower(${compactQuery})) THEN 2
-            ELSE 3 END ASC, a.published_at DESC`
-      const rows = await prisma.$queryRaw(Prisma.sql`
-        SELECT a.article_id AS "articleId", a.category_id AS "categoryId", a.title,
-          a.content, a.steps, a.keywords, a.image, a.images, a.pdf_file AS "pdfFile", a.video_url AS "videoUrl",
-          a.view_count AS "viewCount", a.featured, a.published_at AS "publishedAt",
-          a.created_at AS "createdAt", a.updated_at AS "updatedAt",
-          c.category_name AS "categoryName"
-        FROM articles a JOIN categories c ON c.category_id = a.category_id
-        WHERE a.status = 'PUBLISHED' ${categoryClause} ${searchClause}
-        ORDER BY ${orderClause}
-        LIMIT ${pageSize} OFFSET ${skip}
-      `)
-      items = rows.map(({ categoryName, ...article }) => normalizeArticleImages({ ...article, category: { categoryId: article.categoryId, categoryName } }))
-    } else {
-      const rawItems = await prisma.article.findMany({ where, orderBy, skip, take: pageSize, select: articleSelect })
-      items = rawItems.map(normalizeArticleImages)
-    }
+
     let suggestionPayload = { didYouMean: null, suggestions: [], suggestedArticles: [] }
     if (query && total <= 2) {
       suggestionPayload = await buildSearchSuggestions(query)

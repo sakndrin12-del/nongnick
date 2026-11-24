@@ -50,7 +50,9 @@ function normalizeAdminArticle(article) {
   const rawList = Array.isArray(article.images) ? article.images.filter(Boolean) : []
   const images = rawList.length ? rawList : (article.image ? [article.image] : [])
   const image = article.image || images[0] || null
-  return { ...article, image, images }
+  const keywords = Array.isArray(article.keywords) ? article.keywords.filter(Boolean) : []
+  const steps = Array.isArray(article.steps) ? article.steps : []
+  return { ...article, image, images, keywords, steps }
 }
 
 function bangkokDay(date) {
@@ -107,7 +109,7 @@ router.delete('/search-logs', async (req, res, next) => {
   if (!term || term.length > 120) return res.status(400).json({ message: 'กรุณาระบุคำค้นหาที่ต้องการลบ' })
   try {
     const deleted = await prisma.searchLog.deleteMany({
-      where: { term: { equals: term, mode: 'insensitive' } },
+      where: { term },
     })
     res.json({ message: `ลบคำค้นหา “${term}” เรียบร้อยแล้ว`, deletedCount: deleted.count })
   } catch (error) { next(error) }
@@ -566,12 +568,23 @@ router.get('/articles', async (req, res, next) => {
     const search = typeof req.query.q === 'string' ? req.query.q.trim().slice(0, 120) : ''
     const categoryId = Number.parseInt(req.query.category, 10)
     if (req.query.category && Number.isInteger(categoryId) && categoryId > 0) where.categoryId = categoryId
-    if (search) where.OR = [
-      { title: { contains: search, mode: 'insensitive' } },
-      { content: { contains: search, mode: 'insensitive' } },
-      { keywords: { has: search } },
-    ]
-    const articles = await prisma.article.findMany({ where, orderBy: { updatedAt: 'desc' }, include: { category: { select: { categoryId: true, categoryName: true } } }, take: 100 })
+    let articles = await prisma.article.findMany({ where, orderBy: { updatedAt: 'desc' }, include: { category: { select: { categoryId: true, categoryName: true } } } })
+    if (search) {
+      const qLower = search.toLowerCase()
+      const qCompact = qLower.replace(/-/g, '') || qLower
+      articles = articles.filter((a) => {
+        const title = String(a.title || '').toLowerCase()
+        const content = String(a.content || '').toLowerCase()
+        const kws = Array.isArray(a.keywords) ? a.keywords.map((k) => String(k || '').toLowerCase()) : []
+        return (
+          title.includes(qLower) ||
+          content.includes(qLower) ||
+          title.replace(/-/g, '').includes(qCompact) ||
+          kws.some((k) => k.includes(qLower) || k.replace(/-/g, '').includes(qCompact))
+        )
+      })
+    }
+    articles = articles.slice(0, 100)
     const feedback = articles.length ? await prisma.articleFeedback.groupBy({ by: ['articleId', 'helpful'], where: { articleId: { in: articles.map((article) => article.articleId) } }, _count: { _all: true } }) : []
     const stats = new Map()
     for (const row of feedback) {

@@ -369,13 +369,15 @@ async function main() {
     const effectiveViews = zeroStats ? 0 : views
     const publishedAt = status === 'PUBLISHED' ? new Date(Date.now() - (views % 45) * 86400000) : null
     const content = detail ? `เกริ่นนำ\n${intro}\n\n${detail}` : `เกริ่นนำ\n${intro}`
-    const existing = await prisma.article.findFirst({ where: { title: guide.title }, select: { articleId: true, image: true, pdfFile: true } })
+    const existing = await prisma.article.findFirst({ where: { title: guide.title }, select: { articleId: true, image: true, images: true, pdfFile: true } })
+    const primaryImage = existing?.image || media.imageUrl
     const data = {
       ...fields,
       categoryId,
       content,
       steps,
-      image: existing?.image || media.imageUrl,
+      image: primaryImage,
+      images: Array.isArray(existing?.images) && existing.images.length ? existing.images : (primaryImage ? [primaryImage] : []),
       pdfFile: existing?.pdfFile || media.pdfUrl,
       viewCount: effectiveViews,
       status,

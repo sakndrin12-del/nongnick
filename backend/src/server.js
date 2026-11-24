@@ -3,6 +3,7 @@ import express from 'express'
 import cors from 'cors'
 import helmet from 'helmet'
 import rateLimit from 'express-rate-limit'
+import fs from 'node:fs'
 import path from 'node:path'
 import { fileURLToPath } from 'node:url'
 import publicRoutes from './routes/public.js'
@@ -12,8 +13,12 @@ import { prisma } from './db.js'
 
 const app = express()
 const backendDir = path.dirname(fileURLToPath(import.meta.url))
+const htmlDistDir = path.resolve(backendDir, '../../frontend/dist')
+const htmlEntryFile = path.join(htmlDistDir, 'index.html')
+const htmlPagesDir = path.resolve(backendDir, '../../html-pages')
 const port = Number(process.env.PORT) || 3000
 const allowedOrigin = process.env.FRONTEND_ORIGIN || 'http://localhost:5173'
+const allowedOrigins = new Set([allowedOrigin, `http://localhost:${port}`, 'http://127.0.0.1:3000', 'http://127.0.0.1:5173', 'http://127.0.0.1:5500', 'http://localhost:5500', 'null'])
 const jwtSecret = typeof process.env.JWT_SECRET === 'string' ? process.env.JWT_SECRET.trim() : ''
 if (jwtSecret.length < 32 || /^replace-/i.test(jwtSecret) || /replace-this/i.test(jwtSecret)) {
   throw new Error('ค่า JWT_SECRET ไม่ถูกต้อง ต้องมีอย่างน้อย 32 ตัวอักษรและห้ามใช้ค่าตัวอย่าง สร้างค่าใหม่ด้วยคำสั่ง: node -e "console.log(require(\'crypto\').randomBytes(48).toString(\'hex\'))"')
@@ -32,24 +37,40 @@ app.use(helmet({
   frameguard: false,
   contentSecurityPolicy: {
     directives: {
-      frameAncestors: ["'self'", allowedOrigin],
+      frameAncestors: ["'self'", allowedOrigin, 'http://localhost:5500', 'http://127.0.0.1:5500'],
     },
   },
 }))
-app.use(cors({ origin: allowedOrigin, maxAge: 600 }))
+app.use(cors({
+  origin: (origin, callback) => {
+    if (!origin || allowedOrigins.has(origin)) return callback(null, true)
+    return callback(null, false)
+  },
+  maxAge: 600,
+}))
 app.use(express.json({ limit: '32kb' }))
 app.use('/uploads', express.static(path.resolve(backendDir, '../uploads'), {
   dotfiles: 'deny',
   index: false,
   setHeaders: (res) => res.setHeader('X-Content-Type-Options', 'nosniff'),
 }))
-app.get('/api/health', (_req, res) => res.json({ status: 'ok' }))
+if (fs.existsSync(htmlPagesDir)) {
+  app.use('/html-pages', express.static(htmlPagesDir))
+}
+app.get('/api/health', (_req, res) => res.json({ status: 'ok', database: 'mysql' }))
 app.use('/api', (req, res, next) => {
   if (req.path === '/auth' || req.path.startsWith('/auth/') || req.path === '/admin' || req.path.startsWith('/admin/')) return next()
   return publicApiLimiter(req, res, next)
 }, publicRoutes)
 app.use('/api/auth', authRoutes)
 app.use('/api/admin', adminRoutes)
+if (fs.existsSync(htmlDistDir)) {
+  app.use(express.static(htmlDistDir))
+  app.get(/^(?!\/api(?:\/|$)|\/uploads(?:\/|$)).*/, (_req, res, next) => {
+    if (fs.existsSync(htmlEntryFile)) return res.sendFile(htmlEntryFile)
+    next()
+  })
+}
 app.use((req, res) => res.status(404).json({ message: 'ไม่พบเส้นทางที่ร้องขอ' }))
 app.use(uploadErrorHandler)
 app.use((error, _req, res, _next) => {

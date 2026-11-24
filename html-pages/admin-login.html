@@ -1,0 +1,44 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>เข้าสู่ระบบเจ้าหน้าที่ | คลังความรู้ ICT ขอนแก่น</title>
+  <link rel="icon" type="image/png" href="logo-ict.png" />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600;700&family=Noto+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <main class="admin-login-page">
+    <div class="admin-login-card">
+      <a class="admin-brand" href="index.html">
+        <span class="brand-logos" aria-hidden="true">
+          <img class="brand-logo-seal" src="logo-khonkaen.png" alt="" />
+          <span class="brand-logo-divider"></span>
+          <img class="brand-logo-ict" src="logo-ict.png" alt="" />
+        </span>
+        <span>
+          <b>คลังความรู้ ICT</b>
+          <small>ระบบจัดการสำหรับเจ้าหน้าที่ (MySQL)</small>
+        </span>
+      </a>
+      <div class="admin-login-title">
+        <h1>เข้าสู่ระบบเจ้าหน้าที่</h1>
+        <p>กรอกชื่อผู้ใช้และรหัสผ่านเพื่อเข้าจัดการคลังความรู้</p>
+      </div>
+      <div id="html-login-error" class="admin-login-error" style="display:none;"></div>
+      <form id="html-admin-login-form">
+        <label>ชื่อผู้ใช้งาน
+          <input id="login-username" type="text" required placeholder="เช่น ict-admin หรือ niknat789" />
+        </label>
+        <label>รหัสผ่าน
+          <input id="login-password" type="password" required placeholder="กรอกรหัสผ่านเจ้าหน้าที่" />
+        </label>
+        <button type="submit">เข้าสู่ระบบจัดการ</button>
+      </form>
+      <a class="back-home" href="index.html">← กลับไปหน้าเว็บไซต์หลัก</a>
+    </div>
+  </main>
+  <script src="app.js"></script>
+</body>
+</html>

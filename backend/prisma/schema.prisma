@@ -1,10 +1,10 @@
-// ICT Center Khon Kaen knowledge base data model.
+// ICT Center Khon Kaen knowledge base data model (MySQL).
 generator client {
   provider = "prisma-client-js"
 }
 
 datasource db {
-  provider = "postgresql"
+  provider = "mysql"
 }
 
 enum ArticleStatus {
@@ -19,7 +19,7 @@ model Admin {
   // Store only a bcrypt hash here, never a plain-text password.
   password   String   @map("password_hash") @db.VarChar(255)
   fullname   String   @db.VarChar(160)
-  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  createdAt  DateTime @default(now()) @map("created_at") @db.DateTime(6)
 
   @@map("admins")
 }
@@ -28,7 +28,7 @@ model Category {
   categoryId   Int       @id @default(autoincrement()) @map("category_id")
   categoryName String    @unique @map("category_name") @db.VarChar(160)
   description  String?   @db.Text
-  createdAt    DateTime  @default(now()) @map("created_at") @db.Timestamptz(6)
+  createdAt    DateTime  @default(now()) @map("created_at") @db.DateTime(6)
   articles     Article[]
 
   @@map("categories")
@@ -40,17 +40,17 @@ model Article {
   title       String        @db.VarChar(240)
   content     String        @db.Text
   steps       Json?
-  keywords    String[]      @default([])
+  keywords    Json?
   image       String?       @db.VarChar(1024)
-  images      String[]      @default([])
+  images      Json?
   pdfFile     String?       @map("pdf_file") @db.VarChar(1024)
   videoUrl    String?       @map("video_url") @db.VarChar(1024)
   viewCount   Int           @default(0) @map("view_count")
   status      ArticleStatus @default(DRAFT)
   featured    Boolean       @default(false)
-  publishedAt DateTime?     @map("published_at") @db.Timestamptz(6)
-  createdAt   DateTime      @default(now()) @map("created_at") @db.Timestamptz(6)
-  updatedAt   DateTime      @updatedAt @map("updated_at") @db.Timestamptz(6)
+  publishedAt DateTime?     @map("published_at") @db.DateTime(6)
+  createdAt   DateTime      @default(now()) @map("created_at") @db.DateTime(6)
+  updatedAt   DateTime      @updatedAt @map("updated_at") @db.DateTime(6)
   category    Category      @relation(fields: [categoryId], references: [categoryId], onDelete: Restrict, onUpdate: Cascade)
   feedback    ArticleFeedback[]
   dailyViews  ArticleViewDaily[]
@@ -66,7 +66,7 @@ model ArticleFeedback {
   // Opaque random identifier held by the browser; hash it server-side before storage.
   voterKey   String   @map("voter_key") @db.Char(64)
   helpful    Boolean
-  createdAt  DateTime @default(now()) @map("created_at") @db.Timestamptz(6)
+  createdAt  DateTime @default(now()) @map("created_at") @db.DateTime(6)
   article    Article  @relation(fields: [articleId], references: [articleId], onDelete: Cascade, onUpdate: Cascade)
 
   @@unique([articleId, voterKey])

@@ -1,0 +1,71 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>ภาพรวมระบบเจ้าหน้าที่ | คลังความรู้ ICT ขอนแก่น (MySQL)</title>
+  <link rel="icon" type="image/png" href="logo-ict.png" />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600;700&family=Noto+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <main class="admin-page">
+    <header class="admin-topbar admin-sidebar">
+      <div class="admin-sidebar-top">
+        <a class="admin-brand" href="admin-dashboard.html">
+          <span class="brand-logos" aria-hidden="true">
+            <img class="brand-logo-seal" src="logo-khonkaen.png" alt="" />
+            <span class="brand-logo-divider"></span>
+            <img class="brand-logo-ict" src="logo-ict.png" alt="" />
+          </span>
+          <span>
+            <b>คลังความรู้ ICT</b>
+            <small>พื้นที่เจ้าหน้าที่ (MySQL)</small>
+          </span>
+        </a>
+      </div>
+      <div class="admin-nav-section">
+        <span class="admin-nav-label">เมนูจัดการระบบ</span>
+        <nav class="admin-nav">
+          <a href="admin-dashboard.html" class="active"><span class="admin-nav-icon">▤</span><span>ภาพรวม</span></a>
+          <a href="index.html" class="admin-ext-link"><span class="admin-nav-icon">↗</span><span>หน้าเว็บไซต์หลัก</span></a>
+        </nav>
+      </div>
+      <div class="admin-user-box">
+        <button type="button" onclick="sessionStorage.removeItem('ict-admin-token');localStorage.removeItem('ict-admin-token');location.href='admin-login.html'">ออกจากระบบ</button>
+      </div>
+    </header>
+
+    <div class="admin-workspace">
+      <section class="admin-content admin-dashboard dash-simple">
+        <div class="dash-hero">
+          <div>
+            <span class="dash-hero-kicker">ศูนย์พัฒนาทักษะและการเรียนรู้ ICT เทศบาลนครขอนแก่น · MySQL Database</span>
+            <h1>ภาพรวมคลังความรู้</h1>
+            <p>ดูตัวเลขสำคัญและรายงานประจำเดือนที่ดึงจากฐานข้อมูล MySQL โดยตรง</p>
+          </div>
+        </div>
+
+        <div class="dash-kpi-grid" id="admin-kpi-grid">
+          <p class="admin-loading">กำลังโหลดข้อมูลจาก MySQL...</p>
+        </div>
+
+        <div class="dashboard-panel dash-card monthly-report-panel">
+          <div class="dash-section-head">
+            <div class="dash-section-title">
+              <span class="dash-section-icon">📅</span>
+              <div>
+                <h2>รายงานประจำเดือน</h2>
+                <p>แสดงรายการบทความพร้อมปุ่มแบ่งหน้า 1 2 3 และหน้าถัดไป</p>
+              </div>
+            </div>
+          </div>
+          <ol class="dash-article-list" id="admin-monthly-list"></ol>
+          <nav class="admin-pagination dash-pagination" id="admin-monthly-pagination"></nav>
+        </div>
+      </section>
+    </div>
+  </main>
+  <script src="app.js"></script>
+</body>
+</html>

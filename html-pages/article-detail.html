@@ -1,0 +1,53 @@
+<!doctype html>
+<html lang="th">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>รายละเอียดคู่มือ | ศูนย์ ICT เทศบาลนครขอนแก่น (KKICT)</title>
+  <link rel="icon" type="image/png" href="logo-ict.png" />
+  <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Sans+Thai:wght@400;500;600;700&family=Noto+Sans+Thai:wght@400;500;600;700&display=swap" rel="stylesheet" />
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="site-header">
+    <div class="shell nav-row">
+      <a class="brand" href="index.html">
+        <span class="brand-logos" aria-hidden="true">
+          <img class="brand-logo-seal" src="logo-khonkaen.png" alt="" />
+          <span class="brand-logo-divider"></span>
+          <img class="brand-logo-ict" src="logo-ict.png" alt="" />
+        </span>
+        <span>
+          <b>คลังความรู้ ICT</b>
+          <small>ศูนย์พัฒนาทักษะและการเรียนรู้ ICT เทศบาลนครขอนแก่น</small>
+        </span>
+      </a>
+      <nav>
+        <a href="index.html">หน้าแรก</a>
+        <a href="articles.html" class="active">คลังความรู้</a>
+        <a href="articles.html?saved=1" class="nav-saved-link">
+          <span>★ ที่บันทึกไว้</span>
+          <span class="nav-saved-badge" data-saved-count style="display:none;">0</span>
+        </a>
+      </nav>
+      <div class="nav-actions">
+        <a class="nav-staff-btn" href="admin-login.html"><span>เข้าสู่ระบบเจ้าหน้าที่</span></a>
+      </div>
+    </div>
+  </header>
+
+  <main class="article-detail shell" id="article-detail-container">
+    <div class="loading">กำลังโหลดเนื้อหาคู่มือจากฐานข้อมูล MySQL...</div>
+  </main>
+
+  <nav class="mobile-bottom-nav">
+    <a href="index.html"><span class="mnav-icon">⌂</span><small>หน้าแรก</small></a>
+    <a href="articles.html" class="active"><span class="mnav-icon">▤</span><small>คลังคู่มือ</small></a>
+    <a href="articles.html"><span class="mnav-icon">⌕</span><small>ค้นหา</small></a>
+    <a href="articles.html?saved=1"><span class="mnav-icon">★</span><small>ที่บันทึก</small></a>
+    <a href="admin-login.html"><span class="mnav-icon">⚙</span><small>เจ้าหน้าที่</small></a>
+  </nav>
+
+  <script src="app.js"></script>
+</body>
+</html>
