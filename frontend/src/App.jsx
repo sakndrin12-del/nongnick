@@ -348,7 +348,13 @@ function Footer() {
             <span className="footer-contact-icon" aria-hidden="true">
               <svg viewBox="0 0 24 24" width="17" height="17" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z"/></svg>
             </span>
-            <span>LINE: <a href={lineUrl} target="_blank" rel="noreferrer"><b>{lineId}</b></a></span>
+            <span className="footer-line-item">LINE: <a href={lineUrl} target="_blank" rel="noreferrer"><b>{lineId}</b></a><button type="button" className="footer-qr-btn" onClick={() => setShowQr(true)}>📱 {t('QR Code', 'QR Code')}</button></span>
+          </li>
+          <li>
+            <span className="footer-contact-icon" aria-hidden="true">
+              <svg viewBox="0 0 24 24" width="17" height="17" fill="currentColor"><path d="M15.12 5.32H17V2.14A26.11 26.11 0 0 0 14.26 2c-2.72 0-4.58 1.66-4.58 4.7v2.62H6.61v3.56h3.07V22h3.68v-9.12h3.06l.46-3.56h-3.52V7.05c0-1.05.29-1.73 1.76-1.73z"/></svg>
+            </span>
+            <span>Facebook: <a href={KKICT_FACEBOOK_URL} target="_blank" rel="noreferrer"><b>{t('ศูนย์ ICT ขอนแก่น (KKICT)', 'Khon Kaen ICT Center (KKICT)')}</b></a></span>
           </li>
           <li>
             <span className="footer-contact-icon" aria-hidden="true">
@@ -359,10 +365,10 @@ function Footer() {
         </ul>
         {note && <p className="footer-contact-note">{note}</p>}
         <div className="footer-social-row" aria-label={t('ช่องทางติดต่อโซเชียล', 'Social & contact links')}>
-          <a href="https://www.facebook.com/" target="_blank" rel="noreferrer" aria-label="Facebook">
+          <a href={KKICT_FACEBOOK_URL} target="_blank" rel="noreferrer" aria-label="Facebook KKICT">
             <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M15.12 5.32H17V2.14A26.11 26.11 0 0 0 14.26 2c-2.72 0-4.58 1.66-4.58 4.7v2.62H6.61v3.56h3.07V22h3.68v-9.12h3.06l.46-3.56h-3.52V7.05c0-1.05.29-1.73 1.76-1.73z"/></svg>
           </a>
-          <a href={lineUrl} target="_blank" rel="noreferrer" aria-label="LINE">
+          <a href={lineUrl} target="_blank" rel="noreferrer" aria-label={`LINE ${lineId}`}>
             <svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M20 10.6C20 6.9 16.4 4 12 4S4 6.9 4 10.6c0 3.3 2.9 6 6.8 6.5.3.1.6.2.7.5.1.2 0 .5 0 .7l-.1.7c0 .2-.2.8.7.4.9-.4 4.7-2.8 6.4-4.7 1-1.2 1.5-2.6 1.5-4.1z"/></svg>
           </a>
           <a href="https://www.kkict.net/" target="_blank" rel="noreferrer" aria-label="Website kkict.net">
@@ -392,6 +398,7 @@ function Footer() {
         </nav>
       </div>
     </div>
+    <LineQrModal open={showQr} onClose={() => setShowQr(false)} lineId={lineId} lineUrl={lineUrl}/>
   </footer>
 }
 
