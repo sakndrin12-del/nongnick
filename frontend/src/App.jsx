@@ -1068,7 +1068,44 @@ function ArticlePage() {
   </main>
 }
 
-function PublicLayout() { return <><Header/><Outlet/><Footer/></> }
+function MobileBottomNav() {
+  const { t } = useLang()
+  const { bookmarks } = useSavedGuides()
+  const location = useLocation()
+  const isSavedView = location.pathname === '/articles' && new URLSearchParams(location.search).get('saved') === '1'
+  const isHome = location.pathname === '/'
+  const isLibrary = (location.pathname === '/articles' && !isSavedView) || location.pathname.startsWith('/articles/')
+  const isSearch = location.pathname === '/search'
+  let isAdmin = false
+  try { isAdmin = Boolean(window.sessionStorage.getItem('ict-admin-token')) } catch { /* Ignore storage restrictions. */ }
+  return <nav className="mobile-bottom-nav" aria-label={t('แถบเมนูหลักบนมือถือ', 'Mobile bottom navigation')}>
+    <Link to="/" className={isHome ? 'active' : ''}>
+      <span className="mnav-icon" aria-hidden="true">⌂</span>
+      <small>{t('หน้าแรก', 'Home')}</small>
+    </Link>
+    <Link to="/articles" className={isLibrary ? 'active' : ''}>
+      <span className="mnav-icon" aria-hidden="true">▤</span>
+      <small>{t('คลังคู่มือ', 'Guides')}</small>
+    </Link>
+    <Link to="/search" className={isSearch ? 'active' : ''}>
+      <span className="mnav-icon" aria-hidden="true">⌕</span>
+      <small>{t('ค้นหา', 'Search')}</small>
+    </Link>
+    <Link to="/articles?saved=1" className={isSavedView ? 'active' : ''}>
+      <span className="mnav-icon" aria-hidden="true">
+        ★
+        {bookmarks.length > 0 && <i className="mnav-badge">{bookmarks.length}</i>}
+      </span>
+      <small>{t('ที่บันทึก', 'Saved')}</small>
+    </Link>
+    <Link to={isAdmin ? '/admin' : '/admin/login'}>
+      <span className="mnav-icon" aria-hidden="true">⚙</span>
+      <small>{t('เจ้าหน้าที่', 'Staff')}</small>
+    </Link>
+  </nav>
+}
+
+function PublicLayout() { return <><Header/><Outlet/><Footer/><MobileBottomNav/></> }
 
 function App() {
   return <LanguageProvider><SavedGuidesProvider><Routes>
