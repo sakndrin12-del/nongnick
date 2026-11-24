@@ -178,11 +178,34 @@ function PasswordSettings() {
 const MONTHLY_PREVIEW_COUNT = 5
 const TERM_PREVIEW_COUNT = 5
 
-function ShowMoreButton({ expanded, hiddenCount, onToggle, unit = 'รายการ' }) {
-  if (!expanded && hiddenCount <= 0) return null
-  return <button type="button" className="show-more-btn" aria-expanded={expanded} onClick={onToggle}>
-    {expanded ? <>ย่อรายการ <span aria-hidden="true">▴</span></> : <>ดูเพิ่มเติมอีก {hiddenCount.toLocaleString('th-TH')} {unit} <span aria-hidden="true">▾</span></>}
-  </button>
+function DashPagination({ page, pageSize, totalCount, onPageChange, unit = 'บทความ' }) {
+  const pageCount = Math.max(1, Math.ceil(totalCount / pageSize))
+  if (pageCount <= 1) return null
+  const currentPage = Math.min(Math.max(1, page), pageCount)
+  const start = (currentPage - 1) * pageSize + 1
+  const end = Math.min(currentPage * pageSize, totalCount)
+  return <nav className="admin-pagination dash-pagination" aria-label="การแบ่งหน้ารายการ">
+    <div className="admin-page-summary">
+      <span>แสดง <b>{start.toLocaleString('th-TH')}–{end.toLocaleString('th-TH')}</b> จากทั้งหมด <b>{totalCount.toLocaleString('th-TH')}</b> {unit}</span>
+    </div>
+    <div className="admin-page-controls">
+      <button type="button" disabled={currentPage <= 1} onClick={() => onPageChange(currentPage - 1)}>← ก่อนหน้า</button>
+      <div className="admin-page-numbers">
+        {Array.from({ length: pageCount }, (_, idx) => idx + 1).map((num) => (
+          <button
+            key={num}
+            type="button"
+            className={num === currentPage ? 'active' : ''}
+            aria-current={num === currentPage ? 'page' : undefined}
+            onClick={() => onPageChange(num)}
+          >
+            {num}
+          </button>
+        ))}
+      </div>
+      <button type="button" disabled={currentPage >= pageCount} onClick={() => onPageChange(currentPage + 1)}>ถัดไป →</button>
+    </div>
+  </nav>
 }
 
 function DashSectionTitle({ icon, title, hint, children }) {
