@@ -281,19 +281,20 @@ export function AdminHome() {
   const pendingCount = draftCount + negativeCount
 
   const monthArticles = monthlyData?.articlesInMonth || []
-  const monthExpanded = expandedMonth === activeMonth && activeMonth !== ''
-  const visibleMonthArticles = monthExpanded ? monthArticles : monthArticles.slice(0, MONTHLY_PREVIEW_COUNT)
-  const visibleZeroTerms = expandedTerms.zero ? zeroTerms : zeroTerms.slice(0, TERM_PREVIEW_COUNT)
-  const visibleTopTerms = expandedTerms.top ? topTerms : topTerms.slice(0, TERM_PREVIEW_COUNT)
+  const monthPageCount = Math.max(1, Math.ceil(monthArticles.length / MONTHLY_PREVIEW_COUNT))
+  const currentMonthPage = Math.min(monthPage, monthPageCount)
+  const monthStartIndex = (currentMonthPage - 1) * MONTHLY_PREVIEW_COUNT
+  const visibleMonthArticles = monthArticles.slice(monthStartIndex, monthStartIndex + MONTHLY_PREVIEW_COUNT)
 
-  function toggleMonthList() {
-    if (monthExpanded) {
-      setExpandedMonth('')
-      document.getElementById('monthly-article-list')?.scrollIntoView({ behavior: 'smooth', block: 'start' })
-    } else {
-      setExpandedMonth(activeMonth)
-    }
-  }
+  const zeroPageCount = Math.max(1, Math.ceil(zeroTerms.length / TERM_PREVIEW_COUNT))
+  const currentZeroPage = Math.min(termPages.zero, zeroPageCount)
+  const zeroStartIndex = (currentZeroPage - 1) * TERM_PREVIEW_COUNT
+  const visibleZeroTerms = zeroTerms.slice(zeroStartIndex, zeroStartIndex + TERM_PREVIEW_COUNT)
+
+  const topPageCount = Math.max(1, Math.ceil(topTerms.length / TERM_PREVIEW_COUNT))
+  const currentTopPage = Math.min(termPages.top, topPageCount)
+  const topStartIndex = (currentTopPage - 1) * TERM_PREVIEW_COUNT
+  const visibleTopTerms = topTerms.slice(topStartIndex, topStartIndex + TERM_PREVIEW_COUNT)
 
   return <section className="admin-content admin-dashboard dash-simple">
     <div className="dash-hero">
@@ -364,7 +365,7 @@ export function AdminHome() {
         <DashSectionTitle icon="📅" title="รายงานประจำเดือน" hint="เลือกเดือนเพื่อดูผลงาน และดาวน์โหลดไฟล์ไปทำรายงานส่งหัวหน้าได้ทันที">
           <label className="dash-select">
             <span>เดือน</span>
-            <select aria-label="เลือกเดือนและปีของรายงานประจำเดือน" value={activeMonth} onChange={(event) => setSelectedMonth(event.target.value)}>
+            <select aria-label="เลือกเดือนและปีของรายงานประจำเดือน" value={activeMonth} onChange={(event) => { setSelectedMonth(event.target.value); setMonthPage(1) }}>
               {(monthlyData?.availableMonths || []).map((m) => <option key={m.value} value={m.value}>{m.label}</option>)}
             </select>
           </label>
@@ -399,7 +400,7 @@ export function AdminHome() {
             {monthArticles.length ? <>
               <ol className="dash-article-list">
                 {visibleMonthArticles.map((item, index) => <li key={item.articleId} className="dash-article-row">
-                  <span className="dash-row-num">{index + 1}</span>
+                  <span className="dash-row-num">{monthStartIndex + index + 1}</span>
                   <div className="dash-row-main">
                     <Link className="dash-row-title" to={`/admin/articles/${item.articleId}/edit`} title={item.title}>{item.title}</Link>
                     <div className="dash-row-meta">
@@ -421,7 +422,7 @@ export function AdminHome() {
                   </div>
                 </li>)}
               </ol>
-              <ShowMoreButton expanded={monthExpanded} hiddenCount={monthArticles.length - MONTHLY_PREVIEW_COUNT} onToggle={toggleMonthList} unit="บทความ"/>
+              <DashPagination page={currentMonthPage} pageSize={MONTHLY_PREVIEW_COUNT} totalCount={monthArticles.length} onPageChange={setMonthPage} unit="บทความ"/>
             </> : <p className="dashboard-empty">ไม่มีบทความที่สร้างหรือเผยแพร่ในเดือนนี้ ลองเลือกเดือนอื่นจากตัวเลือกด้านบน</p>}
           </div>
         </>}
@@ -431,7 +432,7 @@ export function AdminHome() {
         <DashSectionTitle icon="📈" title={`ยอดเข้าชม ${insightDays} วันล่าสุด`} hint="จำนวนครั้งที่มีผู้เปิดอ่านคู่มือในแต่ละวัน">
           <label className="dash-select">
             <span>ช่วงเวลา</span>
-            <select aria-label="เลือกช่วงเวลาสถิติยอดเข้าชม" value={insightDays} onChange={(event) => setInsightDays(Number(event.target.value))}>
+            <select aria-label="เลือกช่วงเวลาสถิติยอดเข้าชม" value={insightDays} onChange={(event) => { setInsightDays(Number(event.target.value)); setTermPages({ zero: 1, top: 1 }) }}>
               <option value={7}>7 วันล่าสุด</option>
               <option value={30}>30 วันล่าสุด</option>
               <option value={90}>90 วันล่าสุด</option>
@@ -457,7 +458,7 @@ export function AdminHome() {
                 </div>
               </li>)}
             </ul>
-            <ShowMoreButton expanded={expandedTerms.zero} hiddenCount={zeroTerms.length - TERM_PREVIEW_COUNT} onToggle={() => setExpandedTerms((v) => ({ ...v, zero: !v.zero }))} unit="คำ"/>
+            <DashPagination page={currentZeroPage} pageSize={TERM_PREVIEW_COUNT} totalCount={zeroTerms.length} onPageChange={(next) => setTermPages((v) => ({ ...v, zero: next }))} unit="คำ"/>
           </> : <p className="dashboard-empty">ยังไม่มีคำค้นที่ไม่พบผลลัพธ์ 🎉</p>}
         </div>
 
@@ -465,17 +466,20 @@ export function AdminHome() {
           <DashSectionTitle icon="🔥" title="คำค้นยอดนิยม" hint={`คำที่ผู้ใช้ค้นหาบ่อยที่สุดใน ${insightDays} วันล่าสุด`}/>
           {insights.loading ? <p className="dashboard-empty">กำลังโหลดคำค้นยอดนิยม...</p> : insights.error ? <p className="dashboard-empty" role="alert">{insights.error}</p> : topTerms.length ? <>
             <ul className="dash-term-list">
-              {visibleTopTerms.map((item, idx) => <li key={item.term} className="dash-term-row">
-                <span className={`rank-badge rank-${idx + 1}`}>{idx + 1}</span>
-                <div className="dash-term-main">
-                  <b>{item.term}</b>
-                  <div className="dash-term-bar"><span style={{ width: `${Math.max(8, Math.round(item.count * 100 / maxTopTermCount))}%` }}/></div>
-                </div>
-                <span className="dash-term-count">{item.count.toLocaleString('th-TH')} ครั้ง</span>
-                <button type="button" className="danger-action delete-term-btn" onClick={() => removeSearchTerm(item.term)} aria-label={`ลบคำค้นหา ${item.term}`}>ลบ</button>
-              </li>)}
+              {visibleTopTerms.map((item, idx) => {
+                const rank = topStartIndex + idx + 1
+                return <li key={item.term} className="dash-term-row">
+                  <span className={`rank-badge rank-${rank}`}>{rank}</span>
+                  <div className="dash-term-main">
+                    <b>{item.term}</b>
+                    <div className="dash-term-bar"><span style={{ width: `${Math.max(8, Math.round(item.count * 100 / maxTopTermCount))}%` }}/></div>
+                  </div>
+                  <span className="dash-term-count">{item.count.toLocaleString('th-TH')} ครั้ง</span>
+                  <button type="button" className="danger-action delete-term-btn" onClick={() => removeSearchTerm(item.term)} aria-label={`ลบคำค้นหา ${item.term}`}>ลบ</button>
+                </li>
+              })}
             </ul>
-            <ShowMoreButton expanded={expandedTerms.top} hiddenCount={topTerms.length - TERM_PREVIEW_COUNT} onToggle={() => setExpandedTerms((v) => ({ ...v, top: !v.top }))} unit="คำ"/>
+            <DashPagination page={currentTopPage} pageSize={TERM_PREVIEW_COUNT} totalCount={topTerms.length} onPageChange={(next) => setTermPages((v) => ({ ...v, top: next }))} unit="คำ"/>
           </> : <p className="dashboard-empty">ยังไม่มีข้อมูลคำค้น</p>}
         </div>
       </div>
