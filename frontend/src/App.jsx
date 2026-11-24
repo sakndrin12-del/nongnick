@@ -167,17 +167,43 @@ function safeEmailHref(value) {
   try { const url = new URL(`mailto:${value.trim()}`); return url.protocol === 'mailto:' ? url.href : '' } catch { return '' }
 }
 
+const KKICT_LINE_ID = 'KKICT-Training'
+const KKICT_LINE_URL = 'https://line.me/R/ti/g/sTeVI-fA9K'
+const KKICT_FACEBOOK_URL = 'https://www.facebook.com/KKICT/?ref=embed_page#'
+
 function contactActionHref(contact) {
   return safePhoneHref(contact?.phone) || safeHttpsHref(contact?.lineUrl) || safeEmailHref(contact?.email)
 }
 
+function LineQrModal({ open, onClose, lineId, lineUrl }) {
+  const { t } = useLang()
+  if (!open) return null
+  return <div className="lightbox line-qr-modal" role="dialog" aria-modal="true" aria-label={t('สแกน QR Code LINE ศูนย์ ICT', 'Scan LINE QR Code')} onClick={onClose}>
+    <div className="line-qr-dialog" onClick={(e) => e.stopPropagation()}>
+      <button type="button" className="line-qr-close" onClick={onClose} aria-label={t('ปิดหน้าต่าง', 'Close')}>×</button>
+      <span className="eyebrow">LINE OFFICIAL · KKICT</span>
+      <h3>{t('สแกน QR Code เพื่อติดต่อทาง LINE', 'Scan QR Code to Connect on LINE')}</h3>
+      <p>{t('ศูนย์พัฒนาทักษะและการเรียนรู้ ICT เทศบาลนครขอนแก่น', 'Khon Kaen Municipality ICT Learning Center')}</p>
+      <div className="line-qr-frame">
+        <img src="/line-qr.png" alt={`LINE QR Code ${lineId || KKICT_LINE_ID}`}/>
+      </div>
+      <div className="line-qr-actions">
+        <a className="share-button share-line-btn" href={lineUrl || KKICT_LINE_URL} target="_blank" rel="noreferrer">
+          <span>💬 {t(`เปิดแชต LINE (${lineId || KKICT_LINE_ID}) ↗`, `Open LINE (${lineId || KKICT_LINE_ID}) ↗`)}</span>
+        </a>
+      </div>
+    </div>
+  </div>
+}
+
 function ContactCard({ contact: rawContact, title, className = '' }) {
   const { t, translateContact } = useLang()
+  const [showQr, setShowQr] = useState(false)
   const contact = translateContact(rawContact)
   const heading = title || t('ช่องทางติดต่อ', 'Contact Channels')
   const phone = typeof contact?.phone === 'string' ? contact.phone.trim() : ''
-  const lineId = typeof contact?.lineId === 'string' ? contact.lineId.trim() : ''
-  const lineUrl = safeHttpsHref(contact?.lineUrl)
+  const lineId = (typeof contact?.lineId === 'string' && contact.lineId.trim()) || KKICT_LINE_ID
+  const lineUrl = safeHttpsHref(contact?.lineUrl) || KKICT_LINE_URL
   const email = typeof contact?.email === 'string' ? contact.email.trim() : ''
   const location = typeof contact?.location === 'string' ? contact.location.trim() : ''
   const hours = typeof contact?.hours === 'string' ? contact.hours.trim() : ''
@@ -187,26 +213,35 @@ function ContactCard({ contact: rawContact, title, className = '' }) {
   const emailHref = safeEmailHref(email)
   return <section className={`contact-card ${className}`.trim()} aria-label={heading}>
     <h2>{heading}</h2>
-    <dl className="contact-details">
-      {phone && <div><dt>{t('โทรศัพท์', 'Phone')}</dt><dd>{phoneHref ? <a href={phoneHref}>{phone}</a> : phone}</dd></div>}
-      {(lineId || lineUrl) && <div><dt>LINE</dt><dd>{lineUrl ? <a href={lineUrl} target="_blank" rel="noreferrer">{lineId || t('เปิด LINE', 'Open LINE')}</a> : lineId}</dd></div>}
-      {email && <div><dt>{t('อีเมล', 'Email')}</dt><dd>{emailHref ? <a href={emailHref}>{email}</a> : email}</dd></div>}
-      {location && <div><dt>{t('ที่ตั้ง', 'Location')}</dt><dd>{location}</dd></div>}
-      {hours && <div><dt>{t('เวลาทำการ', 'Service Hours')}</dt><dd>{hours}</dd></div>}
-    </dl>
+    <div className="contact-card-layout">
+      <dl className="contact-details">
+        {phone && <div><dt>{t('โทรศัพท์', 'Phone')}</dt><dd>{phoneHref ? <a href={phoneHref}>{phone}</a> : phone}</dd></div>}
+        {(lineId || lineUrl) && <div><dt>LINE</dt><dd className="contact-line-dd"><a href={lineUrl} target="_blank" rel="noreferrer">{lineId || t('เปิด LINE', 'Open LINE')}</a><button type="button" className="qr-inline-btn" onClick={() => setShowQr(true)}>📱 {t('สแกน QR', 'QR Code')}</button></dd></div>}
+        <div><dt>Facebook</dt><dd><a href={KKICT_FACEBOOK_URL} target="_blank" rel="noreferrer">{t('ศูนย์พัฒนาทักษะและการเรียนรู้ ICT ขอนแก่น ↗', 'Khon Kaen ICT Learning Center (KKICT) ↗')}</a></dd></div>
+        {email && <div><dt>{t('อีเมล', 'Email')}</dt><dd>{emailHref ? <a href={emailHref}>{email}</a> : email}</dd></div>}
+        {location && <div><dt>{t('ที่ตั้ง', 'Location')}</dt><dd>{location}</dd></div>}
+        {hours && <div><dt>{t('เวลาทำการ', 'Service Hours')}</dt><dd>{hours}</dd></div>}
+      </dl>
+      <button type="button" className="contact-qr-box" onClick={() => setShowQr(true)} aria-label={t('คลิกเพื่อขยาย QR Code LINE', 'Click to enlarge LINE QR Code')}>
+        <img src="/line-qr.png" alt={`LINE QR Code ${lineId}`}/>
+        <span>🔍 {t('คลิกขยาย QR Code', 'Enlarge QR Code')}</span>
+      </button>
+    </div>
     {note && <p className="contact-note">{note}</p>}
+    <LineQrModal open={showQr} onClose={() => setShowQr(false)} lineId={lineId} lineUrl={lineUrl}/>
   </section>
 }
 
 function Footer() {
   const { t, translateCategory, translateContact } = useLang()
+  const [showQr, setShowQr] = useState(false)
   const contactRes = usePublicData('/settings/contact')
   const categoriesRes = usePublicData('/categories')
   const rawContact = contactRes.data || {}
   const contact = translateContact(rawContact)
   const phone = (typeof contact?.phone === 'string' && contact.phone.trim()) || '084-583-0208'
-  const lineId = (typeof contact?.lineId === 'string' && contact.lineId.trim()) || 'kkict.net'
-  const lineUrl = safeHttpsHref(contact?.lineUrl) || 'https://www.kkict.net/'
+  const lineId = (typeof contact?.lineId === 'string' && contact.lineId.trim()) || KKICT_LINE_ID
+  const lineUrl = safeHttpsHref(contact?.lineUrl) || KKICT_LINE_URL
   const email = (typeof contact?.email === 'string' && contact.email.trim()) || 'info.kkict@gmail.com'
   const location = (typeof contact?.location === 'string' && contact.location.trim()) || t(
     'ชั้น 2 ตลาดสดเทศบาล 1 ถนนกลางเมือง ต.ในเมือง อ.เมืองขอนแก่น จ.ขอนแก่น 40000',
