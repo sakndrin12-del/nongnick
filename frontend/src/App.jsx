@@ -1,10 +1,109 @@
-import { useEffect, useState } from 'react'
-import { Link, NavLink, Outlet, Route, Routes, useNavigate, useParams, useSearchParams } from 'react-router-dom'
+import { createContext, useCallback, useContext, useEffect, useMemo, useState } from 'react'
+import { Link, NavLink, Outlet, Route, Routes, useLocation, useNavigate, useParams, useSearchParams } from 'react-router-dom'
 import { api, assetUrl, feedbackKey, parseMediaLink, useDocumentTitle } from './services/api'
 import { LanguageProvider, LanguageSwitch, useLang } from './i18n'
 import { AdminLoginPage, AdminPage } from './pages/Admin'
 import { AdminHome, ArticleEditor, ArticleList, CategoryManager, ContactSettings } from './pages/AdminManagement'
 import './App.css'
+
+const BOOKMARKS_STORAGE_KEY = 'ict-bookmarked-guides'
+const RECENT_STORAGE_KEY = 'ict-recently-viewed-guides'
+const SavedGuidesContext = createContext(null)
+
+function readStoredList(key) {
+  try {
+    const raw = window.localStorage.getItem(key)
+    const parsed = raw ? JSON.parse(raw) : []
+    return Array.isArray(parsed) ? parsed.filter((item) => item && Number.isInteger(Number(item.articleId))) : []
+  } catch {
+    return []
+  }
+}
+
+function writeStoredList(key, list) {
+  try { window.localStorage.setItem(key, JSON.stringify(list)) } catch { /* Storage may be restricted. */ }
+}
+
+function toArticleSnapshot(article) {
+  if (!article || !article.articleId) return null
+  return {
+    articleId: Number(article.articleId),
+    categoryId: article.categoryId,
+    title: article.title || '',
+    content: article.content || '',
+    image: article.image || null,
+    images: Array.isArray(article.images) ? article.images : (article.image ? [article.image] : []),
+    pdfFile: article.pdfFile || null,
+    videoUrl: article.videoUrl || null,
+    viewCount: Number(article.viewCount || 0),
+    featured: Boolean(article.featured),
+    publishedAt: article.publishedAt || null,
+    createdAt: article.createdAt || null,
+    updatedAt: article.updatedAt || null,
+    category: article.category ? { categoryId: article.category.categoryId, categoryName: article.category.categoryName } : null,
+  }
+}
+
+function SavedGuidesProvider({ children }) {
+  const [bookmarks, setBookmarks] = useState(() => readStoredList(BOOKMARKS_STORAGE_KEY))
+  const [recentGuides, setRecentGuides] = useState(() => readStoredList(RECENT_STORAGE_KEY))
+
+  const isBookmarked = useCallback((articleId) => {
+    const idNum = Number(articleId)
+    return bookmarks.some((item) => Number(item.articleId) === idNum)
+  }, [bookmarks])
+
+  const toggleBookmark = useCallback((article) => {
+    const snap = toArticleSnapshot(article)
+    if (!snap) return
+    setBookmarks((prev) => {
+      const exists = prev.some((item) => Number(item.articleId) === snap.articleId)
+      const next = exists
+        ? prev.filter((item) => Number(item.articleId) !== snap.articleId)
+        : [snap, ...prev.filter((item) => Number(item.articleId) !== snap.articleId)].slice(0, 30)
+      writeStoredList(BOOKMARKS_STORAGE_KEY, next)
+      return next
+    })
+  }, [])
+
+  const recordRecentView = useCallback((article) => {
+    const snap = toArticleSnapshot(article)
+    if (!snap) return
+    setRecentGuides((prev) => {
+      const next = [snap, ...prev.filter((item) => Number(item.articleId) !== snap.articleId)].slice(0, 8)
+      writeStoredList(RECENT_STORAGE_KEY, next)
+      return next
+    })
+  }, [])
+
+  const clearRecentGuides = useCallback(() => {
+    setRecentGuides([])
+    writeStoredList(RECENT_STORAGE_KEY, [])
+  }, [])
+
+  const clearBookmarks = useCallback(() => {
+    setBookmarks([])
+    writeStoredList(BOOKMARKS_STORAGE_KEY, [])
+  }, [])
+
+  const value = useMemo(() => ({
+    bookmarks,
+    recentGuides,
+    isBookmarked,
+    toggleBookmark,
+    recordRecentView,
+    clearRecentGuides,
+    clearBookmarks,
+  }), [bookmarks, recentGuides, isBookmarked, toggleBookmark, recordRecentView, clearRecentGuides, clearBookmarks])
+
+  return <SavedGuidesContext.Provider value={value}>{children}</SavedGuidesContext.Provider>
+}
+
+function useSavedGuides() {
+  const ctx = useContext(SavedGuidesContext)
+  if (!ctx) throw new Error('useSavedGuides must be used within SavedGuidesProvider')
+  return ctx
+}
 
 const categoryIcons = ['▣', '⌁', '▤', '▧', '◉']
 const excerpt = (value = '') => {
@@ -17,13 +116,23 @@ const excerpt = (value = '') => {
 
 function Header() {
   const { t } = useLang()
+  const { bookmarks } = useSavedGuides()
+  const location = useLocation()
+  const isSavedView = location.pathname === '/articles' && new URLSearchParams(location.search).get('saved') === '1'
   let isAdmin = false
   try { isAdmin = Boolean(window.sessionStorage.getItem('ict-admin-token')) } catch { /* Storage can be disabled by browser policy. */ }
   return <>
     <div className="utility"><div className="shell utility-inner"><span className="utility-org"><img className="utility-seal" src="/logo-khonkaen.png" alt="ตราเทศบาลนครขอนแก่น"/><span>{t('ศูนย์พัฒนาทักษะและการเรียนรู้ ICT เทศบาลนครขอนแก่น (KKICT)', 'Khon Kaen Municipality ICT Skill Development & Learning Center (KKICT)')}</span></span><span>{t('บริการคลังความรู้ดิจิทัล', 'Digital Knowledge Portal')} · <a href="https://www.kkict.net/" target="_blank" rel="noreferrer">{t('เว็บไซต์หลัก kkict.net ↗', 'Main Website kkict.net ↗')}</a></span></div></div>
     <header className="site-header"><div className="shell nav-row">
       <Link className="brand" to="/"><span className="brand-logos" aria-hidden="true"><img className="brand-logo-seal" src="/logo-khonkaen.png" alt=""/><span className="brand-logo-divider"/><img className="brand-logo-ict" src="/logo-ict.png" alt=""/></span><span><b>{t('คลังความรู้ ICT', 'ICT Knowledge Base')}</b><small>{t('ศูนย์พัฒนาทักษะและการเรียนรู้ ICT เทศบาลนครขอนแก่น', 'Khon Kaen Municipality ICT Learning Center')}</small></span></Link>
-      <nav><NavLink to="/" end>{t('หน้าแรก', 'Home')}</NavLink><NavLink to="/articles">{t('คลังความรู้', 'Knowledge Library')}</NavLink></nav>
+      <nav>
+        <NavLink to="/" end>{t('หน้าแรก', 'Home')}</NavLink>
+        <NavLink to="/articles" className={({ isActive }) => (isActive && !isSavedView ? 'active' : '')}>{t('คลังความรู้', 'Knowledge Library')}</NavLink>
+        <Link to="/articles?saved=1" className={`nav-saved-link${isSavedView ? ' active' : ''}`}>
+          <span>★ {t('ที่บันทึกไว้', 'Saved Guides')}</span>
+          {bookmarks.length > 0 && <span className="nav-saved-badge">{bookmarks.length}</span>}
+        </Link>
+      </nav>
       <div className="nav-actions">
         <LanguageSwitch/>
         <Link className="nav-staff-btn" to={isAdmin ? '/admin' : '/admin/login'}>
@@ -292,16 +401,104 @@ function CategoryGrid({ categories = [] }) {
 
 function ArticleCard({ article: rawArticle }) {
   const { t, formatDate, translateArticle } = useLang()
+  const { isBookmarked, toggleBookmark } = useSavedGuides()
   const article = translateArticle(rawArticle)
+  const saved = isBookmarked(article.articleId)
   const imageCount = Array.isArray(article.images) && article.images.length ? article.images.length : (article.image ? 1 : 0)
-  return <article className="article-card"><Link className="article-art" to={`/articles/${article.articleId}`} aria-label={`${t('อ่าน', 'Read')} ${article.title}`}>
+  return <article className="article-card"><div className="article-art-wrap"><Link className="article-art" to={`/articles/${article.articleId}`} aria-label={`${t('อ่าน', 'Read')} ${article.title}`}>
     {article.image ? <img src={assetUrl(article.image)} alt=""/> : <div className="art-placeholder"><span>{article.category?.categoryName || t('คู่มือ ICT', 'ICT Guide')}</span><b>{article.title.slice(0, 1)}</b><i>ICT KNOWLEDGE</i></div>}
     {article.featured && <span className="featured-tag">{t('แนะนำ', 'Featured')}</span>}
     {imageCount > 1 && <span className="image-count-tag">🖼 {imageCount} {t('รูป', 'pics')}</span>}
     {article.videoUrl && <span className="video-tag">▶ {t('วิดีโอ/ลิงก์', 'Video/Link')}</span>}
-  </Link><div className="article-copy"><div className="article-meta"><span>{article.category?.categoryName || t('ความรู้ทั่วไป', 'General Guide')}</span><span>{formatDate(article.publishedAt || article.createdAt)}</span></div>
-    <h3><Link to={`/articles/${article.articleId}`}>{article.title}</Link></h3><p>{excerpt(article.content)}</p><div className="article-bottom"><span>◷ {article.viewCount.toLocaleString('th-TH')} {t('ครั้ง', 'views')}</span><Link to={`/articles/${article.articleId}`}>{t('อ่านเพิ่มเติม', 'Read Guide')} <b>→</b></Link></div>
+  </Link><button
+    type="button"
+    className={`card-bookmark-btn${saved ? ' active' : ''}`}
+    onClick={() => toggleBookmark(rawArticle)}
+    aria-pressed={saved}
+    aria-label={saved ? t(`ยกเลิกบันทึก ${article.title}`, `Remove ${article.title} from saved guides`) : t(`บันทึกคู่มือ ${article.title}`, `Save ${article.title}`)}
+    title={saved ? t('บันทึกไว้แล้ว (คลิกเพื่อนำออก)', 'Saved (click to remove)') : t('บันทึกคู่มือนี้ไว้ดูภายหลัง', 'Save this guide for later')}
+  >{saved ? '★' : '☆'}</button></div><div className="article-copy"><div className="article-meta"><span>{article.category?.categoryName || t('ความรู้ทั่วไป', 'General Guide')}</span><span>{formatDate(article.publishedAt || article.createdAt)}</span></div>
+    <h3><Link to={`/articles/${article.articleId}`}>{article.title}</Link></h3><p>{excerpt(article.content)}</p><div className="article-bottom"><span>◷ {Number(article.viewCount || 0).toLocaleString('th-TH')} {t('ครั้ง', 'views')}</span><Link to={`/articles/${article.articleId}`}>{t('อ่านเพิ่มเติม', 'Read Guide')} <b>→</b></Link></div>
   </div></article>
+}
+
+function PersonalGuidesShelf() {
+  const { t, translateArticle } = useLang()
+  const { bookmarks, recentGuides, toggleBookmark, clearRecentGuides, clearBookmarks } = useSavedGuides()
+  const [activeTab, setActiveTab] = useState('')
+  if (!bookmarks.length && !recentGuides.length) return null
+  const currentTab = activeTab === 'saved' && bookmarks.length
+    ? 'saved'
+    : activeTab === 'recent' && recentGuides.length
+      ? 'recent'
+      : bookmarks.length ? 'saved' : 'recent'
+  const items = (currentTab === 'saved' ? bookmarks : recentGuides).slice(0, 6)
+
+  return <section className="section shell personal-shelf-section" aria-label={t('คลังคู่มือส่วนตัวของคุณ', 'Your Personal Guide Shelf')}>
+    <div className="personal-shelf-box">
+      <div className="personal-shelf-head">
+        <div>
+          <span className="eyebrow">{t('PERSONAL QUICK ACCESS · เก็บไว้ในเบราว์เซอร์ของคุณ', 'PERSONAL QUICK ACCESS · STORED IN YOUR BROWSER')}</span>
+          <h2>{t('คู่มือที่บันทึกไว้ & เปิดอ่านล่าสุด', 'Saved & Recently Viewed Guides')}</h2>
+        </div>
+        <div className="personal-shelf-controls">
+          <div className="personal-shelf-tabs" role="tablist">
+            <button
+              type="button"
+              role="tab"
+              aria-selected={currentTab === 'saved'}
+              className={currentTab === 'saved' ? 'active' : ''}
+              onClick={() => setActiveTab('saved')}
+            >
+              ★ {t('ที่บันทึกไว้', 'Saved Guides')} <span>{bookmarks.length}</span>
+            </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={currentTab === 'recent'}
+              className={currentTab === 'recent' ? 'active' : ''}
+              onClick={() => setActiveTab('recent')}
+            >
+              ◷ {t('เปิดอ่านล่าสุด', 'Recently Viewed')} <span>{recentGuides.length}</span>
+            </button>
+          </div>
+          {currentTab === 'saved' && bookmarks.length > 0 && <>
+            <Link className="text-link" to="/articles?saved=1">{t('ดูที่บันทึกทั้งหมด', 'View All Saved')} <b>→</b></Link>
+            <button type="button" className="shelf-clear-btn" onClick={clearBookmarks}>{t('ล้างที่บันทึก', 'Clear Saved')}</button>
+          </>}
+          {currentTab === 'recent' && recentGuides.length > 0 && (
+            <button type="button" className="shelf-clear-btn" onClick={clearRecentGuides}>{t('ล้างประวัติล่าสุด', 'Clear History')}</button>
+          )}
+        </div>
+      </div>
+
+      {items.length ? <div className="personal-mini-grid">
+        {items.map((rawItem) => {
+          const item = translateArticle(rawItem)
+          return <div className="personal-mini-card" key={`${currentTab}-${item.articleId}`}>
+            <Link className="personal-mini-main" to={`/articles/${item.articleId}`}>
+              <span className="personal-mini-icon" aria-hidden="true">{currentTab === 'saved' ? '★' : '◷'}</span>
+              <div className="personal-mini-copy">
+                <small>{item.category?.categoryName || t('คู่มือ ICT', 'ICT Guide')}</small>
+                <b>{item.title}</b>
+              </div>
+            </Link>
+            {currentTab === 'saved' && <button
+              type="button"
+              className="personal-mini-remove"
+              onClick={() => toggleBookmark(rawItem)}
+              title={t('นำออกจากรายการที่บันทึก', 'Remove from saved guides')}
+              aria-label={t(`นำออก ${item.title}`, `Remove ${item.title}`)}
+            >×</button>}
+          </div>
+        })}
+      </div> : <p className="personal-shelf-empty">
+        {currentTab === 'saved'
+          ? t('ยังไม่มีคู่มือที่บันทึกไว้ — กดปุ่ม ☆ บนการ์ดหรือในหน้าบทความเพื่อบันทึกคู่มือที่ใช้บ่อย', 'No saved guides yet — click ☆ on any guide card or article page to bookmark it for quick access.')
+          : t('ยังไม่มีประวัติคู่มือที่เพิ่งเปิดอ่าน', 'No recently viewed guides yet.')}
+      </p>}
+    </div>
+  </section>
 }
 
 function SectionHeading({ eyebrow, title, action, to }) { return <div className="section-heading"><div><span className="eyebrow">{eyebrow}</span><h2>{title}</h2></div>{action && <Link className="text-link" to={to}>{action} <b>→</b></Link>}</div> }
@@ -316,6 +513,7 @@ function HomePage() {
   useDocumentTitle('')
   return <main>
     <section className="hero"><div className="shell hero-inner"><div className="hero-copy"><div className="hero-kicker"><img className="kicker-seal" src="/logo-khonkaen.png" alt=""/><img className="kicker-ict" src="/logo-ict.png" alt=""/><span>{t('ศูนย์พัฒนาทักษะและการเรียนรู้ ICT เทศบาลนครขอนแก่น', 'Khon Kaen Municipality ICT Learning Center')}</span></div><h1>{t('คลังความรู้และคู่มือไอที', 'IT Knowledge Base & Manuals')}<br/>{t('เพื่อการเรียนรู้และแก้ไขปัญหาด้วยตนเอง', 'for Self-Service Learning & Troubleshooting')}</h1><p>{t('บริการข้อมูลคู่มือการใช้งานคอมพิวเตอร์ เครือข่าย อุปกรณ์สำนักงาน และระบบสารสนเทศ ค้นหาคำตอบได้สะดวกพร้อมขั้นตอนปฏิบัติอย่างเป็นลำดับ', 'Explore step-by-step manuals for computers, wireless networks, office equipment, and municipal information systems — easy to follow anytime.')}</p><SearchBox/><div className="hero-proof"><span>✓</span> {t('มาตรฐานคู่มือเข้าใจง่าย', 'Clear Step-by-Step Guides')} <span>✓</span> {t('ค้นหาได้ตลอด 24 ชั่วโมง', 'Available 24/7 Online')} <span>✓</span> {t('บริการสาธารณะไม่มีค่าใช้จ่าย', 'Free Public Service')}</div></div><div className="hero-visual" aria-hidden="true"><div className="visual-circle"><div className="visual-window"><div className="window-bar"><i/><i/><i/><b>KKICT SERVICE PORTAL</b></div><div className="window-content window-logo-content"><img className="window-logo-seal" src="/logo-khonkaen.png" alt=""/><img className="window-logo-ict" src="/logo-ict.png" alt=""/><div className="window-check">✓</div></div></div><span className="float-chip chip-one">✓ {t('ขั้นตอนชัดเจน ทำตามได้จริง', 'Practical Step-by-Step')}</span><span className="float-chip chip-two">⌕ {t('ค้นหาคู่มือมาตรฐาน', 'Verified IT Manuals')}</span><span className="visual-dot dot-one"/><span className="visual-dot dot-two"/></div></div></div></section>
+    <PersonalGuidesShelf/>
     <section className="section shell categories-section"><SectionHeading eyebrow="BROWSE BY TOPIC" title={t('เลือกหมวดหมู่ความรู้', 'Browse by Category')} action={t('ดูทุกหมวดหมู่', 'View All Categories')} to="/articles"/>{categories.loading ? <div className="loading">{t('กำลังโหลดหมวดหมู่...', 'Loading categories...')}</div> : categories.error ? <ErrorState message={categories.error}/> : categories.data?.length ? <CategoryGrid categories={categories.data}/> : <EmptyState title={t('ยังไม่มีหมวดหมู่', 'No Categories Yet')} detail={t('หมวดหมู่ความรู้จะแสดงที่นี่เมื่อมีการเพิ่มข้อมูล', 'Knowledge categories will appear here once added.')}/>}</section>
     <section className="section latest-section"><div className="shell"><SectionHeading eyebrow="LATEST KNOWLEDGE" title={t('คู่มือและบทความล่าสุด', 'Latest Guides & Articles')} action={t('ดูบทความทั้งหมด', 'View All Guides')} to="/articles"/>{recent.loading ? <div className="loading">{t('กำลังโหลดบทความ...', 'Loading articles...')}</div> : recent.error ? <ErrorState message={recent.error}/> : recent.data?.length ? <div className="article-grid">{(recent.data || []).map((a) => <ArticleCard key={a.articleId} article={a}/>)}</div> : <EmptyState title={t('ยังไม่มีบทความ', 'No Articles Yet')} detail={t('เมื่อมีการเผยแพร่คู่มือ บทความจะแสดงที่นี่', 'Published guides will appear here.')}/>}</div></section>
     {!!featured.data?.length && <section className="section shell"><SectionHeading eyebrow="EDITOR'S PICKS" title={t('บทความแนะนำ', 'Featured Guides')}/><div className="article-grid">{(featured.data || []).map((a) => <ArticleCard key={a.articleId} article={a}/>)}</div></section>}
@@ -336,8 +534,10 @@ function NotFoundPage() {
 }
 
 function ArticlesPage({ search = false }) {
-  const { t, translateCategory, translateKeyword } = useLang()
+  const { t, translateCategory, translateKeyword, translateArticle } = useLang()
+  const { bookmarks, recentGuides, clearRecentGuides, clearBookmarks } = useSavedGuides()
   const [params, setParams] = useSearchParams(); const query = params.get('q') || ''; const categoryId = params.get('category') || ''
+  const savedOnly = params.get('saved') === '1'
   const navigate = useNavigate()
   const categories = usePublicData('/categories')
   const rawSelectedCategory = (categories.data || []).find((category) => String(category.categoryId) === categoryId)
@@ -346,9 +546,16 @@ function ArticlesPage({ search = false }) {
   const searchParams = new URLSearchParams({ sort: params.get('sort') || 'recent', page: String(page), pageSize: '9' })
   if (query) searchParams.set('q', query)
   if (categoryId) searchParams.set('category', categoryId)
-  const path = `/articles/search?${searchParams.toString()}`
+  const path = savedOnly ? '' : `/articles/search?${searchParams.toString()}`
   const results = usePublicData(path)
   function updateFilter(key, value) { const next = new URLSearchParams(params); if (value) next.set(key, value); else next.delete(key); next.delete('page'); setParams(next) }
+  function toggleSavedFilter(enable) {
+    const next = new URLSearchParams(params)
+    if (enable) next.set('saved', '1')
+    else next.delete('saved')
+    next.delete('page')
+    setParams(next)
+  }
   function goToPage(value) { const next = new URLSearchParams(params); next.set('page', String(value)); setParams(next) }
   function applySuggestion(term) {
     const next = new URLSearchParams()
@@ -356,21 +563,67 @@ function ArticlesPage({ search = false }) {
     if (params.get('sort')) next.set('sort', params.get('sort'))
     navigate(`/search?${next.toString()}`)
   }
-  const didYouMean = results.data?.didYouMean || null
-  const suggestions = results.data?.suggestions || []
-  const suggestedArticles = results.data?.suggestedArticles || []
-  useDocumentTitle(search ? (query ? `${t('ค้นหา', 'Search')} “${query}”` : t('ค้นหาคู่มือ', 'Search Guides')) : selectedCategory ? selectedCategory.categoryName : t('คลังความรู้และคู่มือ', 'Knowledge Library'))
-  return <main className="listing-page"><div className="shell"><div className="page-intro"><div className="breadcrumbs"><Link to="/">{t('หน้าแรก', 'Home')}</Link><span>/</span>{search ? t('ผลการค้นหา', 'Search Results') : categoryId && selectedCategory ? <><Link to="/articles">{t('คลังบทความ', 'Knowledge Library')}</Link><span>/</span><span>{selectedCategory.categoryName}</span></> : t('คลังบทความ', 'Knowledge Library')}</div><span className="eyebrow">ICT KNOWLEDGE LIBRARY</span><h1>{selectedCategory && !search ? selectedCategory.categoryName : search ? t('ผลการค้นหา', 'Search Results') : t('คลังความรู้และคู่มือ', 'Knowledge Library & Manuals')}</h1><p>{search ? (query ? <>{t('ผลลัพธ์สำหรับ', 'Showing results for')} <b>“{query}”</b></> : t('พิมพ์คำค้นเพื่อค้นหาคู่มือ', 'Enter a keyword to search for guides')) : t('ค้นหาคู่มือและวิธีแก้ไขปัญหาด้านเทคโนโลยีสารสนเทศ', 'Browse and search our collection of IT manuals and troubleshooting guides')}</p><SearchBox key={query} initial={query}/></div>
-    <div className="listing-layout"><aside className="filter-panel"><b>{t('หมวดหมู่ความรู้', 'Categories')}</b><button className={!categoryId ? 'active' : ''} onClick={() => updateFilter('category', '')}>{t('ทั้งหมด', 'All Categories')}</button>{(categories.data || []).map((rawCat) => { const c = translateCategory(rawCat); return <button key={c.categoryId} className={categoryId === String(c.categoryId) ? 'active' : ''} onClick={() => updateFilter('category', String(c.categoryId))}>{c.categoryName}</button> })}</aside>
-      <section className="listing-results"><div className="results-head"><span>{results.data?.total || 0} {t('บทความ', 'guides')}</span><select aria-label={t('เรียงลำดับ', 'Sort by')} value={params.get('sort') || 'recent'} onChange={(e) => updateFilter('sort', e.target.value)}><option value="recent">{t('ใหม่ล่าสุด', 'Most Recent')}</option><option value="popular">{t('ยอดเข้าชมสูงสุด', 'Most Viewed')}</option></select></div>
-        {results.loading ? <div className="loading">{t('กำลังค้นหาบทความ...', 'Searching guides...')}</div> : results.error ? <ErrorState message={results.error}/> : results.data?.items?.length ? <>
+  const filteredSavedItems = useMemo(() => {
+    if (!savedOnly) return []
+    const qLower = query.trim().toLowerCase()
+    let list = bookmarks.filter((item) => {
+      if (categoryId && String(item.categoryId) !== categoryId) return false
+      if (!qLower) return true
+      const translated = translateArticle(item)
+      const hay = `${item.title} ${translated.title} ${item.content} ${translated.content}`.toLowerCase()
+      return hay.includes(qLower)
+    })
+    if (params.get('sort') === 'popular') {
+      list = [...list].sort((a, b) => Number(b.viewCount || 0) - Number(a.viewCount || 0))
+    }
+    return list
+  }, [savedOnly, bookmarks, categoryId, query, params, translateArticle])
+
+  const displayItems = savedOnly ? filteredSavedItems : (results.data?.items || [])
+  const displayTotal = savedOnly ? filteredSavedItems.length : (results.data?.total || 0)
+  const didYouMean = !savedOnly ? (results.data?.didYouMean || null) : null
+  const suggestions = !savedOnly ? (results.data?.suggestions || []) : []
+  const suggestedArticles = !savedOnly ? (results.data?.suggestedArticles || []) : []
+  useDocumentTitle(savedOnly ? t('คู่มือที่บันทึกไว้', 'Saved Guides') : search ? (query ? `${t('ค้นหา', 'Search')} “${query}”` : t('ค้นหาคู่มือ', 'Search Guides')) : selectedCategory ? selectedCategory.categoryName : t('คลังความรู้และคู่มือ', 'Knowledge Library'))
+  return <main className="listing-page"><div className="shell"><div className="page-intro"><div className="breadcrumbs"><Link to="/">{t('หน้าแรก', 'Home')}</Link><span>/</span>{savedOnly ? t('คู่มือที่บันทึกไว้', 'Saved Guides') : search ? t('ผลการค้นหา', 'Search Results') : categoryId && selectedCategory ? <><Link to="/articles">{t('คลังบทความ', 'Knowledge Library')}</Link><span>/</span><span>{selectedCategory.categoryName}</span></> : t('คลังบทความ', 'Knowledge Library')}</div><span className="eyebrow">ICT KNOWLEDGE LIBRARY</span><h1>{savedOnly ? t('★ คู่มือที่บันทึกไว้', '★ Your Saved Guides') : selectedCategory && !search ? selectedCategory.categoryName : search ? t('ผลการค้นหา', 'Search Results') : t('คลังความรู้และคู่มือ', 'Knowledge Library & Manuals')}</h1><p>{savedOnly ? t('รายการคู่มือที่คุณกดบันทึกเก็บไว้ในเบราว์เซอร์เพื่อเปิดดูซ้ำได้สะดวกโดยไม่ต้องค้นหาใหม่', 'Guides you bookmarked in your browser for quick access without searching again.') : search ? (query ? <>{t('ผลลัพธ์สำหรับ', 'Showing results for')} <b>“{query}”</b></> : t('พิมพ์คำค้นเพื่อค้นหาคู่มือ', 'Enter a keyword to search for guides')) : t('ค้นหาคู่มือและวิธีแก้ไขปัญหาด้านเทคโนโลยีสารสนเทศ', 'Browse and search our collection of IT manuals and troubleshooting guides')}</p><SearchBox key={query} initial={query}/></div>
+    <div className="listing-layout"><aside className="filter-panel">
+      <b>{t('คลังส่วนตัว', 'Personal Shelf')}</b>
+      <button type="button" className={savedOnly ? 'active is-saved-filter' : 'is-saved-filter'} onClick={() => toggleSavedFilter(!savedOnly)}>
+        <span>★ {t('คู่มือที่บันทึกไว้', 'Saved Guides')}</span>
+        <span className="filter-count-pill">{bookmarks.length}</span>
+      </button>
+      <b className="filter-section-title">{t('หมวดหมู่ความรู้', 'Categories')}</b>
+      <button className={!categoryId && !savedOnly ? 'active' : ''} onClick={() => { const next = new URLSearchParams(params); next.delete('category'); next.delete('saved'); next.delete('page'); setParams(next) }}>{t('ทั้งหมด', 'All Categories')}</button>
+      {(categories.data || []).map((rawCat) => { const c = translateCategory(rawCat); return <button key={c.categoryId} className={categoryId === String(c.categoryId) ? 'active' : ''} onClick={() => updateFilter('category', String(c.categoryId))}>{c.categoryName}</button> })}
+      {recentGuides.length > 0 && <div className="sidebar-recent-box">
+        <div className="sidebar-recent-head">
+          <b>◷ {t('เปิดอ่านล่าสุด', 'Recently Viewed')}</b>
+          <button type="button" onClick={clearRecentGuides}>{t('ล้าง', 'Clear')}</button>
+        </div>
+        <ul className="sidebar-recent-list">
+          {recentGuides.slice(0, 5).map((rawItem) => {
+            const item = translateArticle(rawItem)
+            return <li key={`recent-side-${item.articleId}`}>
+              <Link to={`/articles/${item.articleId}`}>{item.title}</Link>
+            </li>
+          })}
+        </ul>
+      </div>}
+    </aside>
+      <section className="listing-results"><div className="results-head"><span>{displayTotal} {t('บทความ', 'guides')}</span><div className="results-head-actions">{savedOnly && bookmarks.length > 0 && <button type="button" className="shelf-clear-btn" onClick={clearBookmarks}>{t('ล้างรายการที่บันทึก', 'Clear All Saved')}</button>}<select aria-label={t('เรียงลำดับ', 'Sort by')} value={params.get('sort') || 'recent'} onChange={(e) => updateFilter('sort', e.target.value)}><option value="recent">{t('ใหม่ล่าสุด', 'Most Recent')}</option><option value="popular">{t('ยอดเข้าชมสูงสุด', 'Most Viewed')}</option></select></div></div>
+        {!savedOnly && results.loading ? <div className="loading">{t('กำลังค้นหาบทความ...', 'Searching guides...')}</div> : !savedOnly && results.error ? <ErrorState message={results.error}/> : displayItems.length ? <>
           {query && suggestions.length > 0 && <div className="search-assist-bar" role="region" aria-label={t('คำค้นใกล้เคียง', 'Related search terms')}>
             <span>💡 {t('คำค้นที่ใกล้เคียง:', 'Related keywords:')}</span>
             {suggestions.map((term) => <button type="button" key={term} className="suggestion-chip" onClick={() => applySuggestion(term)}>{translateKeyword(term)}</button>)}
           </div>}
-          <div className="article-grid">{(results.data?.items || []).map((a) => <ArticleCard key={a.articleId} article={a}/>)}</div>
-          {results.data.pageCount > 1 && <nav className="pagination" aria-label={t('เปลี่ยนหน้าผลการค้นหา', 'Search results pagination')}><button disabled={page <= 1} onClick={() => goToPage(page - 1)}>← {t('ก่อนหน้า', 'Previous')}</button><span>{t(`หน้า ${results.data.page} จาก ${results.data.pageCount}`, `Page ${results.data.page} of ${results.data.pageCount}`)}</span><button disabled={page >= results.data.pageCount} onClick={() => goToPage(page + 1)}>{t('ถัดไป', 'Next')} →</button></nav>}
-        </> : <>
+          <div className="article-grid">{displayItems.map((a) => <ArticleCard key={a.articleId} article={a}/>)}</div>
+          {!savedOnly && results.data.pageCount > 1 && <nav className="pagination" aria-label={t('เปลี่ยนหน้าผลการค้นหา', 'Search results pagination')}><button disabled={page <= 1} onClick={() => goToPage(page - 1)}>← {t('ก่อนหน้า', 'Previous')}</button><span>{t(`หน้า ${results.data.page} จาก ${results.data.pageCount}`, `Page ${results.data.page} of ${results.data.pageCount}`)}</span><button disabled={page >= results.data.pageCount} onClick={() => goToPage(page + 1)}>{t('ถัดไป', 'Next')} →</button></nav>}
+        </> : savedOnly ? <div className="empty-state search-empty-box">
+          <span>★</span>
+          <b>{t('ยังไม่มีคู่มือที่บันทึกไว้', 'No Saved Guides Yet')}</b>
+          <p>{t('คุณสามารถกดปุ่ม ☆ บนมุมการ์ดบทความ หรือปุ่ม “☆ บันทึกคู่มือนี้” ในหน้าอ่านบทความ เพื่อเก็บคู่มือที่ใช้บ่อยไว้เปิดดูที่นี่ได้ทันที', 'Click the ☆ star button on any guide card or inside an article page to bookmark guides for quick access here.')}</p>
+          <button type="button" className="clear-category-btn" onClick={() => toggleSavedFilter(false)}>{t('ดูคู่มือทั้งหมดในคลังความรู้ →', 'Browse All Guides →')}</button>
+        </div> : <>
           <div className="empty-state search-empty-box">
             <span>⌕</span>
             <b>{query ? t(`ไม่พบบทความที่ตรงกับคำว่า “${query}”`, `No guides matched “${query}”`) : t('ไม่พบบทความในหมวดหมู่นี้', 'No guides found in this category')}</b>
@@ -405,11 +658,16 @@ function ArticlesPage({ search = false }) {
 
 function ArticlePage() {
   const { t, formatDate, translateArticle } = useLang()
+  const { bookmarks, recentGuides, isBookmarked, toggleBookmark, recordRecentView } = useSavedGuides()
   const { id } = useParams()
   const [routeParams] = useSearchParams()
   const preview = routeParams.get('preview') === '1'
   const { data: rawArticle, error, loading } = usePublicData(`/articles/${id}${preview ? '?preview=1' : ''}`)
+  useEffect(() => {
+    if (rawArticle?.articleId) recordRecentView(rawArticle)
+  }, [rawArticle, recordRecentView])
   const article = translateArticle(rawArticle)
+  const saved = isBookmarked(rawArticle?.articleId)
   const contact = usePublicData('/settings/contact')
   const [vote, setVote] = useState({ id: '', value: '', count: null, helpfulCount: null })
   const [sending, setSending] = useState(false)
@@ -473,6 +731,27 @@ function ArticlePage() {
     : (article.image ? [article.image] : [])
   const rawImgIdx = activeImageState.articleId === id ? activeImageState.index : 0
   const activeImageIdx = Math.min(Math.max(0, rawImgIdx), Math.max(0, galleryImages.length - 1))
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
   const selectImage = (index) => setActiveImageState({ articleId: id, index })
   const currentImage = galleryImages[activeImageIdx] || null
   const shareUrl = typeof window !== 'undefined' ? window.location.href : ''
@@ -493,6 +772,14 @@ function ArticlePage() {
           {galleryImages.length > 1 && <span>🖼 {galleryImages.length} {t('รูปภาพประกอบ', 'Images')}</span>}
         </div>
         <div className="article-tools">
+          <button
+            type="button"
+            className={`bookmark-action-btn${saved ? ' active' : ''}`}
+            onClick={() => toggleBookmark(rawArticle)}
+            aria-pressed={saved}
+          >
+            {saved ? t('★ บันทึกคู่มือแล้ว', '★ Guide Saved') : t('☆ บันทึกคู่มือนี้', '☆ Save Guide')}
+          </button>
           <button className="print-button" onClick={copyLink}>{copied ? t('✓ คัดลอกลิงก์แล้ว', '✓ Link Copied') : t('⧉ คัดลอกลิงก์คู่มือ', '⧉ Copy Guide Link')}</button>
           <a className="share-button share-line-btn" href={lineShareHref} target="_blank" rel="noopener noreferrer" aria-label={t('แชร์คู่มือนี้ไปยัง LINE', 'Share this guide on LINE')}>
             <svg viewBox="0 0 24 24" width="17" height="17" fill="currentColor" aria-hidden="true"><path d="M19.365 9.863c.349 0 .63.285.63.631 0 .345-.281.63-.63.63H17.61v1.125h1.755c.349 0 .63.283.63.63 0 .344-.281.629-.63.629h-2.386c-.345 0-.627-.285-.627-.629V8.108c0-.345.282-.63.63-.63h2.386c.346 0 .627.285.627.63 0 .349-.281.63-.63.63H17.61v1.125h1.755zm-3.855 3.016c0 .27-.174.51-.432.596-.064.021-.133.031-.199.031-.211 0-.391-.09-.51-.25l-2.443-3.317v2.94c0 .344-.279.629-.631.629-.346 0-.626-.285-.626-.629V8.108c0-.27.173-.51.43-.595.06-.023.136-.033.194-.033.195 0 .375.104.495.254l2.462 3.33V8.108c0-.345.282-.63.63-.63.345 0 .63.285.63.63v4.771zm-5.741 0c0 .344-.282.629-.631.629-.345 0-.627-.285-.627-.629V8.108c0-.345.282-.63.63-.63.346 0 .628.285.628.63v4.771zm-2.466.629H4.917c-.345 0-.63-.285-.63-.629V8.108c0-.345.285-.63.63-.63.348 0 .63.285.63.63v4.141h1.756c.348 0 .629.283.629.63 0 .344-.282.629-.629.629M24 10.314C24 4.943 18.615.572 12 .572S0 4.943 0 10.314c0 4.811 4.27 8.842 10.035 9.608.391.082.923.258 1.058.59.12.301.079.766.038 1.08l-.164 1.02c-.045.301-.24 1.186 1.049.645 1.291-.539 6.916-4.078 9.436-6.975C23.176 14.393 24 12.458 24 10.314"/></svg>
@@ -677,6 +964,36 @@ function ArticlePage() {
           {article.pdfFile && <a className="aside-pdf-cta" href={assetUrl(article.pdfFile)} download>⬇ {t('ดาวน์โหลดคู่มือ PDF (A4)', 'Download PDF Manual (A4)')}</a>}
         </div>
 
+        {(bookmarks.length > 0 || recentGuides.filter((item) => Number(item.articleId) !== Number(article.articleId)).length > 0) && <div className="aside-card aside-history-card">
+          {bookmarks.length > 0 && <div className="aside-history-group">
+            <div className="aside-history-head">
+              <b>★ {t('คู่มือที่บันทึกไว้', 'Saved Guides')} ({bookmarks.length})</b>
+              <Link to="/articles?saved=1">{t('ดูทั้งหมด', 'All')}</Link>
+            </div>
+            <ul className="aside-history-list">
+              {bookmarks.slice(0, 4).map((rawItem) => {
+                const item = translateArticle(rawItem)
+                return <li key={`aside-saved-${item.articleId}`}>
+                  <Link to={`/articles/${item.articleId}`} className={Number(item.articleId) === Number(article.articleId) ? 'is-current' : ''}>{item.title}</Link>
+                </li>
+              })}
+            </ul>
+          </div>}
+          {recentGuides.filter((item) => Number(item.articleId) !== Number(article.articleId)).length > 0 && <div className="aside-history-group">
+            <div className="aside-history-head">
+              <b>◷ {t('เปิดอ่านล่าสุด', 'Recently Viewed')}</b>
+            </div>
+            <ul className="aside-history-list">
+              {recentGuides.filter((item) => Number(item.articleId) !== Number(article.articleId)).slice(0, 4).map((rawItem) => {
+                const item = translateArticle(rawItem)
+                return <li key={`aside-recent-${item.articleId}`}>
+                  <Link to={`/articles/${item.articleId}`}>{item.title}</Link>
+                </li>
+              })}
+            </ul>
+          </div>}
+        </div>}
+
         {quickHelpHref && <a className="aside-support-pill" href={quickHelpHref}>
           <span className="support-pill-icon" aria-hidden="true">☎</span>
           <div>
@@ -712,7 +1029,7 @@ function ArticlePage() {
 function PublicLayout() { return <><Header/><Outlet/><Footer/></> }
 
 function App() {
-  return <LanguageProvider><Routes>
+  return <LanguageProvider><SavedGuidesProvider><Routes>
     <Route path="/admin/login" element={<AdminLoginPage/>}/>
     <Route path="/admin" element={<AdminPage/>}>
       <Route index element={<AdminHome/>}/>
@@ -730,7 +1047,7 @@ function App() {
       <Route path="/articles/:id" element={<ArticlePage/>}/>
       <Route path="*" element={<NotFoundPage/>}/>
     </Route>
-  </Routes></LanguageProvider>
+  </Routes></SavedGuidesProvider></LanguageProvider>
 }
 
 export default App
