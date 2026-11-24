@@ -3094,23 +3094,25 @@ footer::before { top: 0; }
 }
 .dash-row-actions a:hover { border-color: var(--primary); background: var(--primary-soft); }
 
-.show-more-btn {
-  display: flex;
-  width: 100%;
-  min-height: 44px;
-  align-items: center;
-  justify-content: center;
-  gap: 6px;
-  margin-top: 10px;
-  border: 1px dashed var(--primary-tint);
+.dash-pagination.admin-pagination {
+  margin-top: 12px;
+  padding: 11px 16px;
+  border: 1px solid var(--primary-tint);
   border-radius: 12px;
-  background: var(--primary-soft);
-  color: var(--primary-deep);
-  font-size: 14.5px;
-  font-weight: 700;
-  transition: background-color .16s ease, border-color .16s ease;
+  background: var(--surface-muted);
+  box-shadow: none;
 }
-.show-more-btn:hover { border-color: var(--primary); background: #cdeef4; }
+.dash-pagination .admin-page-summary {
+  font-size: 13.5px;
+}
+.dash-pagination .admin-page-controls > button,
+.dash-pagination .admin-page-numbers button {
+  min-height: 36px;
+  background: #ffffff;
+}
+.dash-pagination .admin-page-numbers button.active {
+  background: var(--gold-gradient);
+}
 
 .dash-term-list { display: grid; gap: 8px; margin: 0; padding: 0; list-style: none; }
 .dash-term-row {
