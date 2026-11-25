@@ -13,3 +13,4 @@ uploads/*
 backend/uploads/*
 !backend/uploads/.gitkeep
 *.zip
+single-html-repo/

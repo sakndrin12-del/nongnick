@@ -15,6 +15,7 @@ const IGNORED_SEGMENTS = new Set([
   'dist',
   'dist-ssr',
   'backups',
+  'single-html-repo',
   '.agents',
   '.claude',
   '.windsurf',
