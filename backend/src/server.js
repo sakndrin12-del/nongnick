@@ -16,6 +16,7 @@ const backendDir = path.dirname(fileURLToPath(import.meta.url))
 const htmlDistDir = path.resolve(backendDir, '../../frontend/dist')
 const htmlEntryFile = path.join(htmlDistDir, 'index.html')
 const htmlPagesDir = path.resolve(backendDir, '../../html-pages')
+const singleHtmlFile = path.resolve(backendDir, '../../ict-knowledge-base.html')
 const port = Number(process.env.PORT) || 3000
 const allowedOrigin = process.env.FRONTEND_ORIGIN || 'http://localhost:5173'
 const allowedOrigins = new Set([allowedOrigin, `http://localhost:${port}`, 'http://127.0.0.1:3000', 'http://127.0.0.1:5173', 'http://127.0.0.1:5500', 'http://localhost:5500', 'null'])
@@ -35,15 +36,23 @@ app.set('trust proxy', parsedTrustProxy)
 app.use(helmet({
   crossOriginResourcePolicy: { policy: 'cross-origin' },
   frameguard: false,
+  hsts: false,
   contentSecurityPolicy: {
+    useDefaults: true,
     directives: {
       frameAncestors: ["'self'", allowedOrigin, 'http://localhost:5500', 'http://127.0.0.1:5500'],
+      upgradeInsecureRequests: null,
+      scriptSrc: ["'self'", "'unsafe-inline'"],
+      scriptSrcAttr: ["'unsafe-inline'"],
+      imgSrc: ["'self'", 'data:', 'blob:', 'https:', 'http:'],
+      connectSrc: ["'self'", 'http://localhost:3000', 'http://127.0.0.1:3000', 'http://localhost:5173', 'http://127.0.0.1:5173'],
+      frameSrc: ["'self'", 'https://www.youtube.com', 'https://www.youtube-nocookie.com', 'https://drive.google.com'],
     },
   },
 }))
 app.use(cors({
   origin: (origin, callback) => {
-    if (!origin || allowedOrigins.has(origin)) return callback(null, true)
+    if (!origin || allowedOrigins.has(origin) || /^http:\/\/192\.168\.\d+\.\d+(?::\d+)?$/.test(origin)) return callback(null, true)
     return callback(null, false)
   },
   maxAge: 600,
@@ -57,6 +66,10 @@ app.use('/uploads', express.static(path.resolve(backendDir, '../uploads'), {
 if (fs.existsSync(htmlPagesDir)) {
   app.use('/html-pages', express.static(htmlPagesDir))
 }
+app.get(['/single', '/ict-knowledge-base.html'], (_req, res, next) => {
+  if (fs.existsSync(singleHtmlFile)) return res.sendFile(singleHtmlFile)
+  next()
+})
 app.get('/api/health', (_req, res) => res.json({ status: 'ok', database: 'mysql' }))
 app.use('/api', (req, res, next) => {
   if (req.path === '/auth' || req.path.startsWith('/auth/') || req.path === '/admin' || req.path.startsWith('/admin/')) return next()

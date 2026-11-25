@@ -1,8 +1,9 @@
 import axios from 'axios'
 import { useEffect } from 'react'
 
-const isLocalhost = typeof window === 'undefined' || window.location.hostname === 'localhost' || window.location.hostname === '127.0.0.1'
-const apiBase = import.meta.env.VITE_API_URL || (isLocalhost ? 'http://localhost:3000/api' : '/api')
+const host = typeof window !== 'undefined' && window.location.hostname ? window.location.hostname : 'localhost'
+const isDevPort = typeof window === 'undefined' || window.location.port === '5173'
+const apiBase = import.meta.env.VITE_API_URL || (isDevPort ? `http://${host}:3000/api` : '/api')
 const client = axios.create({
   baseURL: apiBase,
   timeout: 10000,
